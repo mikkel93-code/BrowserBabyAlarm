@@ -1,316 +1,1850 @@
 <!DOCTYPE html>
 <html lang="da">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>BabyVagt - Web Babyalarm</title>
-<!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com"></script>
-<!-- PeerJS til WebRTC P2P-forbindelse -->
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<!-- QR Code generator til nem parring -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<!-- Lucide Icons -->
-<script src="https://unpkg.com/lucide@latest"></script>
-<style>
-/* Pulserende alarm animation */
-@keyframes alertPulse {
-0%, 100% { background-color: rgba(239, 68, 68, 0.1); }
-50% { background-color: rgba(239, 68, 68, 0.4); }
-}
-.crying-alert {
-animation: alertPulse 0.8s infinite;
-}
-@keyframes disconnectPulse {
-0%, 100% { border-color: rgba(239, 68, 68, 1); box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
-50% { border-color: rgba(239, 68, 68, 0.2); box-shadow: 0 0 2px rgba(239, 68, 68, 0.1); }
-}
-.disconnect-alert-frame {
-animation: disconnectPulse 1.2s infinite;
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>BabyVagt - Web Babyalarm</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PeerJS til WebRTC P2P-forbindelse -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <!-- QR Code generator til nem parring -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Pulserende alarm animation */
+    @keyframes alertPulse {
+      0%, 100% { background-color: rgba(239, 68, 68, 0.1); }
+      50% { background-color: rgba(239, 68, 68, 0.4); }
+    }
+    .crying-alert {
+      animation: alertPulse 0.8s infinite;
+    }
+    @keyframes disconnectPulse {
+      0%, 100% { border-color: rgba(239, 68, 68, 1); box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
+      50% { border-color: rgba(239, 68, 68, 0.2); box-shadow: 0 0 2px rgba(239, 68, 68, 0.1); }
+    }
+    .disconnect-alert-frame {
+      animation: disconnectPulse 1.2s infinite;
+    }
+  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col justify-between selection:bg-rose-500 selection:text-white">
-<!-- Top Header Navigation -->
-<header class="p-4 border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-50 flex items-center justify-between">
-<div class="flex items-center gap-2">
-<div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/20">
-<i data-lucide="baby" class="w-5 h-5"></i>
-</div>
-<div>
-<h1 class="font-bold text-base leading-tight tracking-wide">BabyVagt</h1>
-<p class="text-[11px] text-slate-400">P2P Browser Babyalarm</p>
-</div>
-</div>
-<div id="connectionStatusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
-<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-<span id="statusText">Vælger tilstand...</span>
-</div>
-</header>
-<!-- Hovedindhold -->
-<main class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 flex flex-col items-center justify-center">
-<!-- Global fejl / info boks -->
-<div id="noticeBanner" class="hidden w-full max-w-lg mb-4 p-3 rounded-xl text-xs flex items-center justify-between border shadow-lg transition-all">
-<div class="flex items-center gap-2">
-<i id="noticeIcon" data-lucide="info" class="w-4 h-4 shrink-0"></i>
-<span id="noticeMessage">Besked</span>
-</div>
-<button id="closeNoticeBtn" class="p-1 hover:opacity-75">
-<i data-lucide="x" class="w-3.5 h-3.5"></i>
-</button>
-</div>
-<!-- TRIN 1: VÆLG ROLLE -->
-<div id="roleSelectionView" class="w-full max-w-lg space-y-6">
-<div class="text-center space-y-2">
-<h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Vælg enhedstype</h2>
-<p class="text-sm text-slate-400">Begge enheder skal blot have denne side åben i en browser på samme Wi-Fi.</p>
-</div>
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-<!-- Baby Knap -->
-<button id="selectBabyBtn" class="group p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-rose-500/50 hover:bg-slate-800/80 transition-all text-left flex flex-col justify-between h-56 shadow-xl">
-<div class="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-<i data-lucide="video" class="w-6 h-6"></i>
-</div>
-<div>
-<h3 class="font-semibold text-lg text-white mb-1">Baby-enhed</h3>
-<p class="text-xs text-slate-400 leading-relaxed">Telefonen der placeres på babyens værelse. Den streamer video & lyd.</p>
-</div>
-<span class="text-xs font-semibold text-rose-400 flex items-center gap-1">Start afsender →</span>
-</button>
-<!-- Forælder Knap -->
-<button id="selectParentBtn" class="group p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800/80 transition-all text-left flex flex-col justify-between h-56 shadow-xl">
-<div class="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-<i data-lucide="monitor" class="w-6 h-6"></i>
-</div>
-<div>
-<h3 class="font-semibold text-lg text-white mb-1">Forældre-enhed</h3>
-<p class="text-xs text-slate-400 leading-relaxed">Computeren eller telefonen hvorfra du lytter, overvåger og modtager alarmer.</p>
-</div>
-<span class="text-xs font-semibold text-indigo-400 flex items-center gap-1">Åbn modtager →</span>
-</button>
-</div>
-<div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-start gap-3">
-<i data-lucide="shield-check" class="w-5 h-5 text-emerald-400 shrink-0 mt-0.5"></i>
-<span><strong>100% Privat:</strong> Videostrømmen sendes direkte (Peer-to-Peer) krypteret mellem enhederne. Ingen optagelser gemmes på eksterne servere.</span>
-</div>
-</div>
-<!-- ========================================== -->
-<!-- TRIN 2A: BABY KAMERA VISNING (TELEFON)     -->
-<!-- ========================================== -->
-<div id="babyView" class="hidden w-full max-w-lg space-y-4">
-<!-- Fuldt Vågelys Overlay (Kun skærmlys - INGEN blitz) -->
-<div id="fullScreenNightlight" class="fixed inset-0 bg-amber-300 z-40 hidden flex flex-col items-center justify-between p-8 text-amber-950 select-none transition-colors duration-500">
-<div class="flex items-center gap-2 bg-black/15 px-4 py-2 rounded-full text-xs font-bold backdrop-blur">
-<i data-lucide="sun" class="w-4 h-4"></i>
-<span>Skærm-vågelys Aktivt (Kun skærm)</span>
-</div>
-<div class="text-center space-y-4">
-<div class="w-24 h-24 rounded-full bg-white/30 mx-auto flex items-center justify-center shadow-2xl animate-pulse">
-<i data-lucide="baby" class="w-12 h-12"></i>
-</div>
-<p class="text-sm font-semibold">Beroligende natlys (Ingen blitz)</p>
-<div class="flex items-center justify-center gap-2">
-<button data-color="amber" class="nightlight-color-btn px-3 py-1.5 rounded-xl bg-amber-400 text-amber-950 text-xs font-bold border-2 border-amber-950/30">Varm Rav</button>
-<button data-color="rose" class="nightlight-color-btn px-3 py-1.5 rounded-xl bg-rose-500 text-white text-xs font-bold border-2 border-transparent">Rød Nat</button>
-<button data-color="indigo" class="nightlight-color-btn px-3 py-1.5 rounded-xl bg-indigo-400 text-indigo-950 text-xs font-bold border-2 border-transparent">Måneskin</button>
-</div>
-</div>
-<button id="closeFullNightlightBtn" class="px-6 py-3 bg-black/80 text-white rounded-2xl font-bold text-sm shadow-lg">
-Sluk vågelys
-</button>
-</div>
-<!-- 100% Fuldskærms OLED Mørklægning (Slukket skærm på iPhone mens kamera streamer) -->
-<div id="fullScreenBlackout" class="fixed inset-0 bg-black z-50 hidden flex flex-col items-center justify-center p-6 select-none cursor-pointer">
-<div class="text-neutral-900 text-center space-y-1 pointer-events-none">
-<p class="text-[11px] font-medium">OLED Skærm Slukket (Kamera & lyd streamer aktivt)</p>
-<p class="text-[10px]">Tryk på skærmen for at vække</p>
-</div>
-</div>
-<!-- Tilladelses-panel -->
-<div id="permissionRequestPanel" class="bg-slate-900 border border-amber-500/40 p-5 rounded-2xl text-center space-y-3 shadow-xl">
-<div class="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-<i data-lucide="shield-alert" class="w-6 h-6"></i>
-</div>
-<div class="space-y-1">
-<h3 class="font-bold text-base text-white">Tilladelse påkrævet</h3>
-<p class="text-xs text-slate-400">Browseren skal have tilladelse til dit kamera og din mikrofon for at kunne streame.</p>
-</div>
-<button id="grantPermissionsBtn" class="w-full py-3 px-4 bg-gradient-to-r from-rose-500 to-indigo-600 hover:from-rose-600 hover:to-indigo-700 text-white font-semibold text-sm rounded-xl shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2 transition active:scale-[0.98]">
-<i data-lucide="camera" class="w-4 h-4"></i>
-<span>Giv adgang til kamera & mikrofon</span>
-</button>
-<p id="permissionHelpText" class="text-[11px] text-slate-500">Tryk 'Tillad' i browserens pop-up boks, når den anmoder.</p>
-</div>
-<!-- Forbindelses-boks med QR-kode -->
-<div id="babyConnectPanel" class="hidden bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center space-y-4 shadow-xl">
-<div class="flex items-center justify-center gap-2">
-<span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" id="babyServerDot"></span>
-<h3 class="font-bold text-lg text-white" id="babyStatusHeader">Opretter forbindelse til server...</h3>
-</div>
-<p class="text-xs text-slate-400">Scan QR-koden med din computer (eller indtast koden på computerskærmen):</p>
-<div class="flex justify-center p-3 bg-white rounded-xl w-fit mx-auto shadow-inner" id="qrcode"></div>
-<div class="flex items-center justify-center gap-2">
-<span class="text-xs text-slate-400">Kode:</span>
-<span id="babyRoomCode" class="font-mono font-bold tracking-widest text-indigo-400 bg-slate-800 px-3 py-1 rounded-lg select-all text-sm">Venter...</span>
-<button id="copyCodeBtn" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="Kopiér kode">
-<i data-lucide="copy" class="w-4 h-4"></i>
-</button>
-</div>
-</div>
-<!-- Kamera Preview & Status -->
-<div class="relative bg-black rounded-2xl overflow-hidden aspect-[4/3] border border-slate-800 shadow-2xl flex items-center justify-center">
-<video id="babyCameraPreview" autoplay playsinline muted class="w-full h-full object-cover"></video>
-<div id="cameraStandbyPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 p-4 text-center space-y-2">
-<i data-lucide="video-off" class="w-8 h-8 text-slate-600"></i>
-<p class="text-xs text-slate-400">Kamera afventer tilladelse</p>
-</div>
-<div id="babyNightLightOverlay" class="absolute inset-0 bg-amber-400/20 mix-blend-screen hidden pointer-events-none"></div>
-<div id="babyBlackoutOverlay" class="absolute inset-0 bg-black hidden flex items-center justify-center text-slate-700">
-<p class="text-xs">Skærm sparetilstand aktiv (Kamera kører i baggrunden)</p>
-</div>
-<div id="babyStreamingBadge" class="hidden absolute top-3 left-3 bg-black/60 backdrop-blur px-2.5 py-1 rounded-md text-[11px] text-white flex items-center gap-1.5">
-<span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-<span>Sender video & lyd</span>
-</div>
-<div id="babyLocalBatteryBadge" class="absolute top-3 right-3 bg-black/60 backdrop-blur px-2.5 py-1 rounded-md text-[11px] text-emerald-400 flex items-center gap-1 border border-slate-700/60">
-<i data-lucide="battery-charging" class="w-3.5 h-3.5"></i>
-<span id="babyLocalBatteryText">100%</span>
-</div>
-<div id="babyLocalMicBadge" class="hidden absolute bottom-3 left-3 right-3 bg-black/70 backdrop-blur px-3 py-2 rounded-xl flex items-center gap-2 border border-slate-700/60">
-<i data-lucide="mic" class="w-4 h-4 text-emerald-400 shrink-0"></i>
-<div class="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-<div id="babyLocalMicBar" class="h-full bg-emerald-400 w-0 transition-all duration-75"></div>
-</div>
-<span id="babyLocalMicText" class="text-[10px] font-mono text-slate-300 w-8 text-right">0%</span>
-</div>
-</div>
-<audio id="parentIntercomAudio" autoplay playsinline></audio>
-<!-- Baby Kontrolknapper -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-<button id="toggleCameraFlipBtn" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-200">
-<i data-lucide="refresh-cw" class="w-5 h-5"></i>
-<span class="text-[11px]">Vend kamera</span>
-</button>
-<button id="toggleNightlightBtn" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-200">
-<i data-lucide="sun" class="w-5 h-5 text-amber-400"></i>
-<span class="text-[11px]">Skærm-lys</span>
-</button>
-<button id="toggleLullabyLocalBtn" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-200">
-<i data-lucide="music" class="w-5 h-5 text-rose-400"></i>
-<span class="text-[11px]" id="localLullabyLabel">Sovelyd: Fra</span>
-</button>
-<button id="toggleBlackoutBtn" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-200">
-<i data-lucide="moon" class="w-5 h-5 text-indigo-400"></i>
-<span class="text-[11px]">Sluk skærm (OLED)</span>
-</button>
-</div>
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-<div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-2">
-<span class="text-xs text-slate-400 flex items-center gap-1.5">
-<i data-lucide="cloud-rain" class="w-4 h-4 text-sky-400"></i> Sovelyd:
-</span>
-<select id="localSoundSelect" class="bg-slate-950 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500">
-<option value="off">Slukket</option>
-<option value="womb">Livmoder / Brun støj</option>
-<option value="rain">Blid Regn</option>
-<option value="waves">Havbølger</option>
-<option value="heartbeat">Roligt Hjerteslag</option>
-<option value="lullaby">Spilledåse Vuggevise</option>
-</select>
-</div>
-<div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-2">
-<span class="text-xs text-slate-400 flex items-center gap-1.5">
-<i data-lucide="battery" class="w-4 h-4 text-emerald-400"></i> Strøm:
-</span>
-<select id="localBatterySelect" class="bg-slate-950 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500">
-<option value="charging">Sidder i oplader ⚡</option>
-<option value="100" selected>~100% (Estimer afladning)</option>
-<option value="80">~80% (Estimer afladning)</option>
-<option value="60">~60% (Estimer afladning)</option>
-<option value="40">~40% (Estimer afladning)</option>
-<option value="20">~20% (Lavt batteri)</option>
-</select>
-</div>
-</div>
-<p class="text-[11px] text-slate-500 text-center">Tip: Brug "Sluk skærm (OLED)" i stedet for telefonens fysiske låseknap, så Apple iOS ikke afbryder kameraet.</p>
-</div>
-<!-- ========================================== -->
-<!-- TRIN 2B: FORÆLDRE MONITOR VISNING (PC)     -->
-<!-- ========================================== -->
-<div id="parentView" class="hidden w-full max-w-4xl space-y-4">
-<div id="parentConnectPanel" class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md mx-auto space-y-4 shadow-xl">
-<h3 class="font-bold text-lg text-white text-center">Forbind til Baby-enhed</h3>
-<p class="text-xs text-slate-400 text-center">Indtast den 6-cifrede kode, som vises på babyens telefon:</p>
-<div class="flex gap-2">
-<input type="text" id="targetPeerIdInput" placeholder="F.eks. 123456" class="flex-1 bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-xl font-mono text-center tracking-widest text-lg uppercase focus:outline-none focus:border-indigo-500 text-white placeholder-slate-600">
-<button id="connectToBabyBtn" class="bg-indigo-600 hover:bg-indigo-500 font-semibold px-5 py-2.5 rounded-xl transition text-sm flex items-center justify-center gap-2">
-<span id="connectBtnSpinner" class="hidden w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-<span id="connectBtnText">Forbind</span>
-</button>
-</div>
-<p class="text-[11px] text-slate-500 text-center">Bemærk: Sørg for at babyens telefon har godkendt kamera og viser status "Klar til parring!".</p>
-</div>
-<!-- Monitor Video Display -->
-<div id="parentStreamContainer" class="hidden space-y-4">
-<div id="videoMonitorFrame" class="relative bg-black rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl aspect-video flex items-center justify-center transition-colors duration-300">
-<video id="remoteVideo" autoplay playsinline class="w-full h-full object-cover"></video>
-<button id="unlockAudioOverlayBtn" class="hidden absolute top-4 left-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 z-30 animate-bounce">
-<i data-lucide="volume-2" class="w-4 h-4"></i>
-<span>Klik her for at aktivere lyd i browseren</span>
-</button>
-<!-- KRITISK ADVARSEL VED MISTET FORBINDELSE -->
-<div id="disconnectAlertBanner" class="absolute inset-0 bg-rose-950/90 backdrop-blur z-40 hidden flex flex-col items-center justify-center p-6 text-center space-y-3">
-<div class="w-16 h-16 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-2xl animate-bounce">
-<i data-lucide="wifi-off" class="w-8 h-8"></i>
-</div>
-<div class="space-y-1">
-<h3 class="font-extrabold text-xl text-white tracking-wide">FORBINDELSE MISTET TIL BABY-ENHED!</h3>
-<p class="text-xs text-rose-200 max-w-sm">Telefonen har mistet Wi-Fi, er gået ud eller appen blev lukket. Forsøger automatisk at genoprette...</p>
-</div>
-<div class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/40 border border-rose-500/50 text-xs text-rose-300">
-<span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-<span id="reconnectStatusText">Søger efter enhed...</span>
-</div>
-</div>
-<div class="absolute top-4 right-4 flex flex-wrap items-center justify-end gap-2 z-20">
-<div id="remoteBatteryBadge" class="bg-slate-900/90 backdrop-blur text-emerald-400 border border-slate-700/80 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-lg" title="Telefonens batteristatus">
-<i id="remoteBatteryIcon" data-lucide="battery-full" class="w-4 h-4"></i>
-<span id="remoteBatteryText">--%</span>
-</div>
-<div id="remoteBlackoutStatusBadge" class="hidden bg-slate-800/90 text-indigo-300 border border-indigo-500/30 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow">
-<i data-lucide="moon" class="w-3.5 h-3.5"></i> Skærm Mørklagt
-</div>
-<div id="remoteNightlightStatusBadge" class="hidden bg-amber-500/90 text-slate-950 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow">
-<i data-lucide="sun" class="w-3.5 h-3.5"></i> Vågelys Tændt
-</div>
-<div id="remoteNoiseStatusBadge" class="hidden bg-rose-500/90 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow">
-<i data-lucide="music" class="w-3.5 h-3.5"></i> <span id="remoteNoiseBadgeText">Sovelyd spiller</span>
-</div>
-<button id="fullscreenBtn" class="bg-slate-900/80 hover:bg-slate-800 text-white p-2 rounded-xl border border-slate-700/60" title="Fuld skærm">
-<i data-lucide="maximize" class="w-4 h-4"></i>
-</button>
-</div>
-<!-- Alarm Banner ved babygråd -->
-<div id="alarmBanner" class="absolute top-4 inset-x-4 bg-rose-600/95 backdrop-blur text-white px-4 py-3 rounded-2xl flex items-center justify-between shadow-2xl transform -translate-y-32 transition-transform duration-300 z-30">
-<div class="flex items-center gap-3">
-<span class="p-2 bg-white/20 rounded-xl animate-bounce">
-<i data-lucide="bell-ring" class="w-6 h-6"></i>
-</span>
-<div>
-<p class="font-bold text-sm">LYD OVER GRÆNSE DETEKTERET!</p>
-<p class="text-xs text-rose-100">Mikrofonen på babyværelset registrerede høj lyd.</p>
-</div>
-</div>
-<button id="dismissAlarmBtn" class="text-xs bg-white text-rose-700 font-bold px-3 py-1.5 rounded-lg shadow">Afvis</button>
-</div>
-<!-- Lydniveau Bar Overlay (VOX) -->
-<div class="absolute bottom-4 left-4 right-4 bg-slate-900/85 backdrop-blur p-3 rounded-2xl border border-slate-700/60 flex flex-col gap-2">
-<div class="flex items-center justify-between text-xs text-slate-300">
-<span class="flex items-center gap-1.5">
-<i data-lucide="mic" class="w-3.5 h-3.5 text-emerald-400"></i>
-<span>Lyd fra babyværelse (Live mikrofon):</span>
-</span>
-<span id="decibelLabel" class="font-mono font-bold text-white">0%</span>
-</div>
-<div class="relative w-full h-3.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-<div id="volumeBar" class="h-full bg-emerald-500 transition-a
+
+  <!-- Top Header Navigation -->
+  <header class="p-4 border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-50 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/20">
+        <i data-lucide="baby" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-base leading-tight tracking-wide">BabyVagt</h1>
+        <p class="text-[11px] text-slate-400">P2P Browser Babyalarm</p>
+      </div>
+    </div>
+    <div id="connectionStatusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+      <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+      <span id="statusText">Vælger tilstand...</span>
+    </div>
+  </header>
+
+  <!-- Hovedindhold -->
+  <main class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 flex flex-col items-center justify-center">
+
+    <!-- Global fejl / info boks -->
+    <div id="noticeBanner" class="hidden w-full max-w-lg mb-4 p-3 rounded-xl text-xs flex items-center justify-between border shadow-lg transition-all">
+      <div class="flex items-center gap-2">
+        <i id="noticeIcon" data-lucide="info" class="w-4 h-4 shrink-0"></i>
+        <span id="noticeMessage">Besked</span>
+      </div>
+      <button id="closeNoticeBtn" class="p-1 hover:opacity-75">
+        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+      </button>
+    </div>
+
+    <!-- TRIN 1: VÆLG ROLLE -->
+    <div id="roleSelectionView" class="w-full max-w-lg space-y-6">
+      <div class="text-center space-y-2">
+        <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Vælg enhedstype</h2>
+        <p class="text-sm text-slate-400">Begge enheder skal blot have denne side åben i en browser på samme Wi-Fi.</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <!-- Baby Knap -->
+        <button id="selectBabyBtn" class="group p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-rose-500/50 hover:bg-slate-800/80 transition-all text-left flex flex-col justify-between h-56 shadow-xl cursor-pointer">
+          <div class="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <i data-lucide="video" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h3 class="font-semibold text-lg text-white mb-1">Baby-enhed</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">Telefonen der placeres på babyens værelse. Den streamer video & lyd.</p>
+          </div>
+          <span class="text-xs font-semibold text-rose-400 flex items-center gap-1">Start afsender &rarr;</span>
+        </button>
+
+        <!-- Forælder Knap -->
+        <button id="selectParentBtn" class="group p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800/80 transition-all text-left flex flex-col justify-between h-56 shadow-xl cursor-pointer">
+          <div class="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <i data-lucide="monitor" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h3 class="font-semibold text-lg text-white mb-1">Forældre-enhed</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">Computeren eller telefonen hvorfra du lytter, overvåger og modtager alarmer.</p>
+          </div>
+          <span class="text-xs font-semibold text-indigo-400 flex items-center gap-1">Åbn modtager &rarr;</span>
+        </button>
+      </div>
+
+      <div class="bg-slate-900/40 p-4 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-start gap-3">
+        <i data-lucide="shield-check" class="w-5 h-5 text-emerald-400 shrink-0 mt-0.5"></i>
+        <span><strong>100% Privat:</strong> Videostrømmen sendes direkte (Peer-to-Peer) krypteret mellem enhederne. Ingen optagelser gemmes på eksterne servere.</span>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TRIN 2A: BABY KAMERA VISNING (TELEFON)     -->
+    <!-- ========================================== -->
+    <div id="babyView" class="hidden w-full max-w-lg space-y-4">
+      
+      <!-- Fuldt Vågelys Overlay (Kun skærmlys - INGEN blitz) -->
+      <div id="fullScreenNightlight" class="fixed inset-0 bg-amber-300 z-40 hidden flex flex-col items-center justify-between p-8 text-amber-950 select-none transition-colors duration-500">
+        <div class="flex items-center gap-2 bg-black/15 px-4 py-2 rounded-full text-xs font-bold backdrop-blur">
+          <i data-lucide="sun" class="w-4 h-4"></i>
+          <span>Skærm-vågelys Aktivt (Kun skærm)</span>
+        </div>
+        <div class="text-center space-y-4">
+          <div class="w-24 h-24 rounded-full bg-white/30 mx-auto flex items-center justify-center shadow-2xl animate-pulse">
+            <i data-lucide="baby" class="w-12 h-12"></i>
+          </div>
+          <p class="text-sm font-semibold">Beroligende natlys (Ingen blitz)</p>
+          <div class="flex items-center justify-center gap-2">
+            <button data-color="amber" class="nightlight-color-btn px-3 py-1.5 rounded-xl bg-amber-400 text-amber-950 text-xs font-bold border-2 border-amber-950/30">Varm Rav</button>
+            <button data-color="rose" class="nightlight-color-btn px-3 py-1.5 rounded-xl bg-rose-500 text-white text-xs font-bold border-2 border-transparent">Rød Nat</button>
+            <button data-color="indigo" class="nightlight-color-btn px-3 py-1.5 rounded-xl bg-indigo-400 text-indigo-950 text-xs font-bold border-2 border-transparent">Måneskin</button>
+          </div>
+        </div>
+        <button id="closeFullNightlightBtn" class="px-6 py-3 bg-black/80 text-white rounded-2xl font-bold text-sm shadow-lg">
+          Sluk vågelys
+        </button>
+      </div>
+
+      <!-- 100% Fuldskærms OLED Mørklægning (Slukket skærm på iPhone mens kamera streamer) -->
+      <div id="fullScreenBlackout" class="fixed inset-0 bg-black z-50 hidden flex flex-col items-center justify-center p-6 select-none cursor-pointer">
+        <div class="text-neutral-900 text-center space-y-1 pointer-events-none">
+          <p class="text-[11px] font-medium">OLED Skærm Slukket (Kamera & lyd streamer aktivt)</p>
+          <p class="text-[10px]">Tryk på skærmen for at vække</p>
+        </div>
+      </div>
+
+      <!-- Tilladelses-panel -->
+      <div id="permissionRequestPanel" class="bg-slate-900 border border-amber-500/40 p-5 rounded-2xl text-center space-y-3 shadow-xl">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+          <i data-lucide="shield-alert" class="w-6 h-6"></i>
+        </div>
+        <div class="space-y-1">
+          <h3 class="font-bold text-base text-white">Tilladelse påkrævet</h3>
+          <p class="text-xs text-slate-400">Browseren skal have tilladelse til dit kamera og din mikrofon for at kunne streame.</p>
+        </div>
+        <button id="grantPermissionsBtn" class="w-full py-3 px-4 bg-gradient-to-r from-rose-500 to-indigo-600 hover:from-rose-600 hover:to-indigo-700 text-white font-semibold text-sm rounded-xl shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2 transition active:scale-[0.98]">
+          <i data-lucide="camera" class="w-4 h-4"></i>
+          <span>Giv adgang til kamera & mikrofon</span>
+        </button>
+        <p id="permissionHelpText" class="text-[11px] text-slate-500">Tryk 'Tillad' i browserens pop-up boks, når den anmoder.</p>
+      </div>
+
+      <!-- Forbindelses-boks med QR-kode -->
+      <div id="babyConnectPanel" class="hidden bg-slate-900 border border-slate-800 p-6 rounded-2xl text-center space-y-4 shadow-xl">
+        <div class="flex items-center justify-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" id="babyServerDot"></span>
+          <h3 class="font-bold text-lg text-white" id="babyStatusHeader">Opretter forbindelse til server...</h3>
+        </div>
+        <p class="text-xs text-slate-400">Scan QR-koden med din computer (eller indtast koden på computerskærmen):</p>
+        
+        <div class="flex justify-center p-3 bg-white rounded-xl w-fit mx-auto shadow-inner" id="qrcode"></div>
+
+        <div class="flex items-center justify-center gap-2">
+          <span class="text-xs text-slate-400">Kode:</span>
+          <span id="babyRoomCode" class="font-mono font-bold tracking-widest text-indigo-400 bg-slate-800 px-3 py-1 rounded-lg select-all text-sm">Venter...</span>
+          <button id="copyCodeBtn" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="Kopiér kode">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Kamera Preview & Status -->
+      <div class="relative bg-black rounded-2xl overflow-hidden aspect-[4/3] border border-slate-800 shadow-2xl flex items-center justify-center">
+        <video id="babyCameraPreview" autoplay playsinline muted class="w-full h-full object-cover"></video>
+        
+        <div id="cameraStandbyPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 p-4 text-center space-y-2">
+          <i data-lucide="video-off" class="w-8 h-8 text-slate-600"></i>
+          <p class="text-xs text-slate-400">Kamera afventer tilladelse</p>
+        </div>
+
+        <div id="babyNightLightOverlay" class="absolute inset-0 bg-amber-400/20 mix-blend-screen hidden pointer-events-none"></div>
+        <div id="babyBlackoutOverlay" class="absolute inset-0 bg-black hidden flex items-center justify-center text-slate-700">
+          <p class="text-xs">Skærm sparetilstand aktiv (Kamera kører i baggrunden)</p>
+        </div>
+
+        <div id="babyStreamingBadge" class="hidden absolute top-3 left-3 bg-black/60 backdrop-blur px-2.5 py-1 rounded-md text-[11px] text-white flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+          <span>Sender video & lyd</span>
+        </div>
+
+        <div id="babyLocalBatteryBadge" class="absolute top-3 right-3 bg-black/60 backdrop-blur px-2.5 py-1 rounded-md text-[11px] text-emerald-400 flex items-center gap-1 border border-slate-700/60">
+          <i data-lucide="battery-charging" class="w-3.5 h-3.5"></i>
+          <span id="babyLocalBatteryText">100%</span>
+        </div>
+
+        <div id="babyLocalMicBadge" class="hidden absolute bottom-3 left-3 right-3 bg-black/70 backdrop-blur px-3 py-2 rounded-xl flex items-center gap-2 border border-slate-700/60">
+          <i data-lucide="mic" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+          <div class="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div id="babyLocalMicBar" class="h-full bg-emerald-400 w-0 transition-all duration-75"></div>
+          </div>
+          <span id="babyLocalMicText" class="text-[10px] font-mono text-slate-300 w-8 text-right">0%</span>
+        </div>
+      </div>
+
+      <audio id="parentIntercomAudio" autoplay playsinline></audio>
+
+      <!-- Baby Kontrolknapper -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <button id="toggleCameraFlipBtn" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-200 cursor-pointer">
+          <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+          <span class="text-[11px]">Vend kamera</span>
+        </button>
+        <button id="toggleNightlightBtn" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-200 cursor-pointer">
+          <i data-lucide="sun" class="w-5 h-5 text-amber-400"></i>
+          <span class="text-[11px]">Skærm-lys</span>
+        </button>
+        <button id="toggleLullabyLocalBtn" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-200 cursor-pointer">
+          <i data-lucide="music" class="w-5 h-5 text-rose-400"></i>
+          <span class="text-[11px]" id="localLullabyLabel">Sovelyd: Fra</span>
+        </button>
+        <button id="toggleBlackoutBtn" class="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-200 cursor-pointer">
+          <i data-lucide="moon" class="w-5 h-5 text-indigo-400"></i>
+          <span class="text-[11px]">Sluk skærm (OLED)</span>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-2">
+          <span class="text-xs text-slate-400 flex items-center gap-1.5">
+            <i data-lucide="cloud-rain" class="w-4 h-4 text-sky-400"></i> Sovelyd:
+          </span>
+          <select id="localSoundSelect" class="bg-slate-950 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer">
+            <option value="off">Slukket</option>
+            <option value="womb">Livmoder / Brun støj</option>
+            <option value="rain">Blid Regn</option>
+            <option value="waves">Havbølger</option>
+            <option value="heartbeat">Roligt Hjerteslag</option>
+            <option value="lullaby">Spilledåse Vuggevise</option>
+          </select>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-2">
+          <span class="text-xs text-slate-400 flex items-center gap-1.5">
+            <i data-lucide="battery" class="w-4 h-4 text-emerald-400"></i> Strøm:
+          </span>
+          <select id="localBatterySelect" class="bg-slate-950 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer">
+            <option value="charging">Sidder i oplader ⚡</option>
+            <option value="100" selected>~100% (Estimer afladning)</option>
+            <option value="80">~80% (Estimer afladning)</option>
+            <option value="60">~60% (Estimer afladning)</option>
+            <option value="40">~40% (Estimer afladning)</option>
+            <option value="20">~20% (Lavt batteri)</option>
+          </select>
+        </div>
+      </div>
+
+      <p class="text-[11px] text-slate-500 text-center">Tip: Brug "Sluk skærm (OLED)" i stedet for telefonens fysiske låseknap, så Apple iOS ikke afbryder kameraet.</p>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TRIN 2B: FORÆLDRE MONITOR VISNING (PC)     -->
+    <!-- ========================================== -->
+    <div id="parentView" class="hidden w-full max-w-4xl space-y-4">
+      
+      <div id="parentConnectPanel" class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md mx-auto space-y-4 shadow-xl">
+        <h3 class="font-bold text-lg text-white text-center">Forbind til Baby-enhed</h3>
+        <p class="text-xs text-slate-400 text-center">Indtast den 6-cifrede kode, som vises på babyens telefon:</p>
+        
+        <div class="flex gap-2">
+          <input type="text" id="targetPeerIdInput" placeholder="F.eks. 123456" class="flex-1 bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-xl font-mono text-center tracking-widest text-lg uppercase focus:outline-none focus:border-indigo-500 text-white placeholder-slate-600">
+          <button id="connectToBabyBtn" class="bg-indigo-600 hover:bg-indigo-500 font-semibold px-5 py-2.5 rounded-xl transition text-sm flex items-center justify-center gap-2 cursor-pointer">
+            <span id="connectBtnSpinner" class="hidden w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            <span id="connectBtnText">Forbind</span>
+          </button>
+        </div>
+
+        <p class="text-[11px] text-slate-500 text-center">Bemærk: Sørg for at babyens telefon har godkendt kamera og viser status "Klar til parring!".</p>
+      </div>
+
+      <!-- Monitor Video Display -->
+      <div id="parentStreamContainer" class="hidden space-y-4">
+        
+        <div id="videoMonitorFrame" class="relative bg-black rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl aspect-video flex items-center justify-center transition-colors duration-300">
+          <video id="remoteVideo" autoplay playsinline class="w-full h-full object-cover"></video>
+
+          <button id="unlockAudioOverlayBtn" class="hidden absolute top-4 left-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 z-30 animate-bounce cursor-pointer">
+            <i data-lucide="volume-2" class="w-4 h-4"></i>
+            <span>Klik her for at aktivere lyd i browseren</span>
+          </button>
+
+          <!-- KRITISK ADVARSEL VED MISTET FORBINDELSE -->
+          <div id="disconnectAlertBanner" class="absolute inset-0 bg-rose-950/90 backdrop-blur z-40 hidden flex flex-col items-center justify-center p-6 text-center space-y-3">
+            <div class="w-16 h-16 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-2xl animate-bounce">
+              <i data-lucide="wifi-off" class="w-8 h-8"></i>
+            </div>
+            <div class="space-y-1">
+              <h3 class="font-extrabold text-xl text-white tracking-wide">FORBINDELSE MISTET TIL BABY-ENHED!</h3>
+              <p class="text-xs text-rose-200 max-w-sm">Telefonen har mistet Wi-Fi, er gået ud eller appen blev lukket. Forsøger automatisk at genoprette...</p>
+            </div>
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/40 border border-rose-500/50 text-xs text-rose-300">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+              <span id="reconnectStatusText">Søger efter enhed...</span>
+            </div>
+          </div>
+
+          <div class="absolute top-4 right-4 flex flex-wrap items-center justify-end gap-2 z-20">
+            <div id="remoteBatteryBadge" class="bg-slate-900/90 backdrop-blur text-emerald-400 border border-slate-700/80 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-lg" title="Telefonens batteristatus">
+              <i id="remoteBatteryIcon" data-lucide="battery-full" class="w-4 h-4"></i>
+              <span id="remoteBatteryText">--%</span>
+            </div>
+
+            <div id="remoteBlackoutStatusBadge" class="hidden bg-slate-800/90 text-indigo-300 border border-indigo-500/30 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow">
+              <i data-lucide="moon" class="w-3.5 h-3.5"></i> Skærm Mørklagt
+            </div>
+            <div id="remoteNightlightStatusBadge" class="hidden bg-amber-500/90 text-slate-950 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow">
+              <i data-lucide="sun" class="w-3.5 h-3.5"></i> Vågelys Tændt
+            </div>
+            <div id="remoteNoiseStatusBadge" class="hidden bg-rose-500/90 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow">
+              <i data-lucide="music" class="w-3.5 h-3.5"></i> <span id="remoteNoiseBadgeText">Sovelyd spiller</span>
+            </div>
+            <button id="fullscreenBtn" class="bg-slate-900/80 hover:bg-slate-800 text-white p-2 rounded-xl border border-slate-700/60 cursor-pointer" title="Fuld skærm">
+              <i data-lucide="maximize" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Alarm Banner ved babygråd -->
+          <div id="alarmBanner" class="absolute top-4 inset-x-4 bg-rose-600/95 backdrop-blur text-white px-4 py-3 rounded-2xl flex items-center justify-between shadow-2xl transform -translate-y-32 transition-transform duration-300 z-30">
+            <div class="flex items-center gap-3">
+              <span class="p-2 bg-white/20 rounded-xl animate-bounce">
+                <i data-lucide="bell-ring" class="w-6 h-6"></i>
+              </span>
+              <div>
+                <p class="font-bold text-sm">LYD OVER GRÆNSE DETEKTERET!</p>
+                <p class="text-xs text-rose-100">Mikrofonen på babyværelset registrerede høj lyd.</p>
+              </div>
+            </div>
+            <button id="dismissAlarmBtn" class="text-xs bg-white text-rose-700 font-bold px-3 py-1.5 rounded-lg shadow cursor-pointer">Afvis</button>
+          </div>
+
+          <!-- Lydniveau Bar Overlay (VOX) -->
+          <div class="absolute bottom-4 left-4 right-4 bg-slate-900/85 backdrop-blur p-3 rounded-2xl border border-slate-700/60 flex flex-col gap-2">
+            <div class="flex items-center justify-between text-xs text-slate-300">
+              <span class="flex items-center gap-1.5">
+                <i data-lucide="mic" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Lyd fra babyværelse (Live mikrofon):</span>
+              </span>
+              <span id="decibelLabel" class="font-mono font-bold text-white">0%</span>
+            </div>
+            
+            <div class="relative w-full h-3.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+              <div id="volumeBar" class="h-full bg-emerald-500 transition-all duration-75 w-0"></div>
+              <div id="thresholdMarker" class="absolute top-0 bottom-0 w-1 bg-rose-500 z-10 shadow-[0_0_8px_#f43f5e]" style="left: 35%;" title="Gråd-tærskel"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard Kontrolpanel for Forælder -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-xs text-slate-200 flex items-center gap-1.5">
+                <i data-lucide="volume-2" class="w-4 h-4 text-emerald-400"></i> PC Medhør & Lyd-boost
+              </span>
+              <span id="gainValueLabel" class="text-xs font-mono text-emerald-400">150%</span>
+            </div>
+
+            <div class="space-y-1">
+              <input type="range" id="audioGainSlider" min="0" max="400" value="150" class="w-full accent-emerald-500 cursor-pointer">
+              <div class="flex justify-between text-[10px] text-slate-500">
+                <span>Mute (0%)</span>
+                <span>Normal (100%)</span>
+                <span>Boost (400%)</span>
+              </div>
+            </div>
+
+            <button id="muteAudioBtn" class="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 border border-emerald-500/30 transition cursor-pointer">
+              <i data-lucide="volume-2" class="w-4 h-4"></i> Medhør er Aktivt (Klik for Mute)
+            </button>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3 flex flex-col justify-between">
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-semibold text-slate-200 flex items-center gap-1.5">
+                <i data-lucide="bell" class="w-4 h-4 text-rose-400"></i> Gråd-alarm Tærskel (VOX)
+              </span>
+              <span id="thresholdValueText" class="text-rose-400 font-mono font-bold">35%</span>
+            </div>
+
+            <div class="space-y-1">
+              <input type="range" id="sensitivitySlider" min="5" max="95" value="35" class="w-full accent-rose-500 cursor-pointer">
+              <p class="text-[10px] text-slate-400">Hvis lyden fra babyen overstiger den røde streg (<span id="thresholdInlineText">35%</span>), blinker skærmen.</p>
+            </div>
+
+            <label class="flex items-center justify-between text-xs text-slate-300 bg-slate-950/60 px-3 py-2 rounded-xl border border-slate-800 cursor-pointer">
+              <span>Bip-advarsel på PC ved gråd</span>
+              <input type="checkbox" id="enableAlarmBeepCheckbox" checked class="accent-rose-500 w-4 h-4 rounded cursor-pointer">
+            </label>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between space-y-3">
+            <span class="font-semibold text-xs text-slate-200 flex items-center gap-1.5">
+              <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i> Fjernstyr Baby-telefon
+            </span>
+
+            <div class="grid grid-cols-3 gap-2">
+              <button id="remoteNightlightBtn" class="py-2 px-2 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl flex flex-col items-center justify-center gap-1 border border-slate-700 transition cursor-pointer">
+                <i data-lucide="sun" class="w-4 h-4 text-amber-400"></i>
+                <span class="text-[11px]">Skærm-lys</span>
+              </button>
+              <button id="remoteBlackoutBtn" class="py-2 px-2 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl flex flex-col items-center justify-center gap-1 border border-slate-700 transition cursor-pointer" title="Sluk/mørklæg iPhonens skærm helt (OLED)">
+                <i data-lucide="moon" class="w-4 h-4 text-indigo-400"></i>
+                <span class="text-[11px]">Sluk skærm</span>
+              </button>
+              <button id="remoteFlipCameraBtn" class="py-2 px-2 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl flex flex-col items-center justify-center gap-1 border border-slate-700 transition cursor-pointer">
+                <i data-lucide="refresh-cw" class="w-4 h-4 text-sky-400"></i>
+                <span class="text-[11px]">Kamera</span>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2 bg-slate-950/70 p-2 rounded-xl border border-slate-800">
+              <i data-lucide="cloud-rain" class="w-4 h-4 text-rose-400 shrink-0 ml-1"></i>
+              <select id="remoteSoundSelect" class="flex-1 bg-transparent text-xs text-slate-200 focus:outline-none cursor-pointer">
+                <option value="off" class="bg-slate-900">Sovelyd: Slukket</option>
+                <option value="womb" class="bg-slate-900">Livmoder / Brun støj</option>
+                <option value="rain" class="bg-slate-900">Blid Regnvejr</option>
+                <option value="waves" class="bg-slate-900">Rolige Havbølger</option>
+                <option value="heartbeat" class="bg-slate-900">Hjerteslag (60 BPM)</option>
+                <option value="lullaby" class="bg-slate-900">Spilledåse Vuggevise</option>
+              </select>
+            </div>
+
+            <button id="pushToTalkBtn" class="w-full py-2.5 bg-indigo-600/20 hover:bg-indigo-600/30 active:bg-indigo-600 text-indigo-200 active:text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 border border-indigo-500/40 select-none transition cursor-pointer">
+              <i data-lucide="mic" class="w-4 h-4"></i>
+              <span id="pttLabel">Hold nede for at tale til baby</span>
+            </button>
+          </div>
+
+        </div>
+
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+          <div class="flex items-center gap-2">
+            <i data-lucide="clock" class="w-4 h-4 text-slate-500"></i>
+            <span>Seneste hændelse:</span>
+            <span id="lastActivityLog" class="text-slate-200 font-medium">Ingen gråd registreret endnu</span>
+          </div>
+          <div class="flex items-center gap-4">
+            <span id="parentFooterBatteryInfo" class="text-[11px] text-slate-400">Telefon strøm: Afventer...</span>
+            <span id="connectionPingText" class="text-[11px] font-mono text-emerald-400">P2P Direkte Stream</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer class="p-4 text-center text-xs text-slate-500 border-t border-slate-800">
+    BabyVagt &bull; P2P WebRTC overvågning
+  </footer>
+
+  <script>
+    const peerConfig = {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' }
+        ]
+      }
+    };
+
+    let peer = null;
+    let currentCall = null;
+    let dataChannel = null;
+    let localStream = null;
+    let audioContext = null;
+    let analyserNode = null;
+    let gainNode = null;
+    let wakeLock = null;
+
+    let currentFacingMode = "environment";
+    let isNightLightOn = false;
+    let isBlackoutOn = false;
+    let currentSoundMode = "off";
+    let whiteNoiseContext = null;
+    let activeSoundNodes = [];
+    let activeSoundIntervals = [];
+    let babyMicContext = null;
+
+    let batteryState = {
+      level: 100,
+      charging: false,
+      isEstimated: false
+    };
+    let iosEstimateTimer = null;
+
+    let soundThreshold = 35;
+    let isMuted = false;
+    let currentGainValue = 1.5;
+    let remoteMediaStream = null;
+    let webrtcAudioPumpElement = null;
+    let remoteVolumeFromDataChannel = 0;
+    let alarmCooldown = false;
+    let isConnecting = false;
+    let pttStream = null;
+    let pttCall = null;
+    let lowBatteryAlertShown = false;
+
+    // Forbindelsesvagt (Heartbeat / Disconnect state)
+    let lastHeartbeatTime = Date.now();
+    let isDisconnectedState = false;
+    let heartbeatCheckInterval = null;
+    let activeTargetRoomCode = null;
+
+    const roleSelectionView = document.getElementById('roleSelectionView');
+    const babyView = document.getElementById('babyView');
+    const parentView = document.getElementById('parentView');
+    const statusText = document.getElementById('statusText');
+    const connectionStatusBadge = document.getElementById('connectionStatusBadge');
+    const noticeBanner = document.getElementById('noticeBanner');
+    const noticeMessage = document.getElementById('noticeMessage');
+    const closeNoticeBtn = document.getElementById('closeNoticeBtn');
+    const permissionRequestPanel = document.getElementById('permissionRequestPanel');
+    const grantPermissionsBtn = document.getElementById('grantPermissionsBtn');
+    const cameraStandbyPlaceholder = document.getElementById('cameraStandbyPlaceholder');
+    const babyStreamingBadge = document.getElementById('babyStreamingBadge');
+    const babyConnectPanel = document.getElementById('babyConnectPanel');
+
+    lucide.createIcons();
+
+    function showNotice(text, type = "info") {
+      noticeBanner.classList.remove('hidden', 'bg-rose-950/80', 'border-rose-800', 'text-rose-200', 'bg-emerald-950/80', 'border-emerald-800', 'text-emerald-200', 'bg-slate-800', 'border-slate-700', 'text-slate-200');
+      
+      if (type === "error") {
+        noticeBanner.classList.add('bg-rose-950/80', 'border-rose-800', 'text-rose-200');
+      } else if (type === "success") {
+        noticeBanner.classList.add('bg-emerald-950/80', 'border-emerald-800', 'text-emerald-200');
+      } else {
+        noticeBanner.classList.add('bg-slate-800', 'border-slate-700', 'text-slate-200');
+      }
+
+      noticeMessage.innerText = text;
+      lucide.createIcons();
+    }
+
+    closeNoticeBtn.addEventListener('click', () => {
+      noticeBanner.classList.add('hidden');
+    });
+
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.warn('Wake Lock ikke understøttet eller afvist:', err);
+      }
+    }
+
+    function generateRoomCode() {
+      return Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const joinCodeFromUrl = urlParams.get('join');
+
+    async function initBabyBatteryMonitor() {
+      const localBatterySelect = document.getElementById('localBatterySelect');
+
+      if ('getBattery' in navigator) {
+        try {
+          const battery = await navigator.getBattery();
+          if (localBatterySelect && localBatterySelect.parentElement) {
+            localBatterySelect.parentElement.classList.add('hidden');
+          }
+
+          const updateFromHardware = () => {
+            batteryState.level = Math.round(battery.level * 100);
+            batteryState.charging = battery.charging;
+            batteryState.isEstimated = false;
+            updateBabyLocalBatteryUI();
+            syncBabyStateToParent();
+          };
+
+          updateFromHardware();
+          battery.addEventListener('levelchange', updateFromHardware);
+          battery.addEventListener('chargingchange', updateFromHardware);
+          return;
+        } catch (e) {
+          console.warn("Kunne ikke læse hardware batteri:", e);
+        }
+      }
+
+      batteryState.isEstimated = true;
+      applyManualBatterySelection(localBatterySelect.value);
+
+      localBatterySelect.addEventListener('change', (e) => {
+        applyManualBatterySelection(e.target.value);
+      });
+
+      if (iosEstimateTimer) clearInterval(iosEstimateTimer);
+      iosEstimateTimer = setInterval(() => {
+        if (batteryState.charging) return;
+        const drainPerMinute = isBlackoutOn ? (1 / 7) : (1 / 4);
+        batteryState.level = Math.max(1, +(batteryState.level - drainPerMinute).toFixed(1));
+        updateBabyLocalBatteryUI();
+        syncBabyStateToParent();
+      }, 60000);
+    }
+
+    function applyManualBatterySelection(val) {
+      if (val === 'charging') {
+        batteryState.charging = true;
+        batteryState.level = 100;
+      } else {
+        batteryState.charging = false;
+        batteryState.level = parseInt(val, 10) || 100;
+      }
+      updateBabyLocalBatteryUI();
+      syncBabyStateToParent();
+    }
+
+    function updateBabyLocalBatteryUI() {
+      const txtEl = document.getElementById('babyLocalBatteryText');
+      if (!txtEl) return;
+      const rounded = Math.round(batteryState.level);
+      if (batteryState.charging) {
+        txtEl.innerText = `Oplader ⚡`;
+      } else {
+        txtEl.innerText = `${batteryState.isEstimated ? '~' : ''}${rounded}%`;
+      }
+    }
+
+    // =========================================================
+    // ROLLE 1: BABY ENHED (Afsender / Telefon)
+    // =========================================================
+    document.getElementById('selectBabyBtn').addEventListener('click', () => {
+      roleSelectionView.classList.add('hidden');
+      babyView.classList.remove('hidden');
+      updateStatus("Afventer kamera-tilladelse...", "amber");
+
+      initBabyBatteryMonitor();
+
+      if (!window.isSecureContext) {
+        showNotice("Advarsel: Siden kører ikke over HTTPS. Browseren kan blokere kamera og mikrofon.", "error");
+      }
+    });
+
+    grantPermissionsBtn.addEventListener('click', async () => {
+      await startBabyStream();
+    });
+
+    async function startBabyStream() {
+      try {
+        updateStatus("Anmoder om kamera & mikrofon...", "amber");
+
+        if (localStream) {
+          localStream.getTracks().forEach(track => track.stop());
+        }
+
+        const constraints = {
+          video: {
+            facingMode: { ideal: currentFacingMode },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: false,
+            autoGainControl: true
+          }
+        };
+
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        const previewVideo = document.getElementById('babyCameraPreview');
+        previewVideo.srcObject = localStream;
+        await previewVideo.play().catch(() => {});
+
+        permissionRequestPanel.classList.add('hidden');
+        cameraStandbyPlaceholder.classList.add('hidden');
+        babyStreamingBadge.classList.remove('hidden');
+        babyConnectPanel.classList.remove('hidden');
+
+        setupLocalBabyMicMeter(localStream);
+        await requestWakeLock();
+
+        if (currentCall && currentCall.peerConnection) {
+          const videoTrack = localStream.getVideoTracks()[0];
+          const sender = currentCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+          if (sender && videoTrack) {
+            sender.replaceTrack(videoTrack);
+          }
+        }
+
+        if (!peer) {
+          initBabyPeer();
+        }
+      } catch (err) {
+        console.error("Kamera/Mikrofon fejl:", err);
+        showNotice("Kunne ikke få adgang til kamera/mikrofon: " + (err.message || err.name), "error");
+        updateStatus("Tilladelse afvist", "rose");
+      }
+    }
+
+    function setupLocalBabyMicMeter(stream) {
+      try {
+        if (!stream.getAudioTracks().length) return;
+        if (!babyMicContext) {
+          babyMicContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (babyMicContext.state === 'suspended') {
+          babyMicContext.resume();
+        }
+
+        const src = babyMicContext.createMediaStreamSource(stream);
+        const analyser = babyMicContext.createAnalyser();
+        analyser.fftSize = 256;
+        src.connect(analyser);
+
+        const data = new Uint8Array(analyser.fftSize);
+        const badge = document.getElementById('babyLocalMicBadge');
+        const bar = document.getElementById('babyLocalMicBar');
+        const txt = document.getElementById('babyLocalMicText');
+        badge.classList.remove('hidden');
+
+        let lastSentTime = 0;
+
+        function updateLocalMeter() {
+          if (!localStream) return;
+          analyser.getByteTimeDomainData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) {
+            const norm = (data[i] - 128) / 128;
+            sum += norm * norm;
+          }
+          const rms = Math.sqrt(sum / data.length);
+          const pct = Math.min(100, Math.round(rms * 320));
+          bar.style.width = pct + '%';
+          txt.innerText = pct + '%';
+
+          const now = performance.now();
+          if (dataChannel && dataChannel.open && (now - lastSentTime > 100)) {
+            lastSentTime = now;
+            dataChannel.send({ type: 'audioLevel', level: pct });
+          }
+
+          requestAnimationFrame(updateLocalMeter);
+        }
+        updateLocalMeter();
+      } catch (e) {
+        console.warn("Lokal mic meter fejl:", e);
+      }
+    }
+
+    function initBabyPeer() {
+      const roomCode = generateRoomCode();
+      const fullPeerId = `babyvagt-${roomCode}`;
+
+      peer = new Peer(fullPeerId, peerConfig);
+
+      peer.on('open', () => {
+        document.getElementById('babyRoomCode').innerText = roomCode;
+        document.getElementById('babyStatusHeader').innerText = "Klar til parring!";
+        const dot = document.getElementById('babyServerDot');
+        dot.classList.remove('bg-amber-400', 'animate-ping');
+        dot.classList.add('bg-emerald-400');
+
+        updateStatus("Klar til parring (" + roomCode + ")", "emerald");
+
+        const qrContainer = document.getElementById('qrcode');
+        qrContainer.innerHTML = "";
+        const joinUrl = `${window.location.origin}${window.location.pathname}?join=${roomCode}`;
+        new QRCode(qrContainer, {
+          text: joinUrl,
+          width: 150,
+          height: 150
+        });
+      });
+
+      peer.on('call', (call) => {
+        if (call.metadata && call.metadata.type === 'intercom') {
+          call.answer();
+          call.on('stream', (parentAudioStream) => {
+            const audioEl = document.getElementById('parentIntercomAudio');
+            audioEl.srcObject = parentAudioStream;
+            audioEl.play().catch(() => {});
+          });
+          return;
+        }
+
+        currentCall = call;
+        call.answer(localStream);
+        updateStatus("Forældre-enhed tilsluttet!", "emerald");
+        showNotice("Forældre-enhed er nu forbundet og overvåger.", "success");
+      });
+
+      peer.on('connection', (conn) => {
+        dataChannel = conn;
+        conn.on('open', () => {
+          syncBabyStateToParent();
+        });
+        conn.on('data', (data) => {
+          if (data && data.type === 'heartbeatPing') {
+            conn.send({ type: 'heartbeatPong' });
+            return;
+          }
+          handleRemoteBabyCommand(data);
+        });
+      });
+
+      peer.on('error', (err) => {
+        console.error("Baby Peer fejl:", err);
+        if (err.type === 'unavailable-id') {
+          peer.destroy();
+          initBabyPeer();
+        } else {
+          showNotice("Netværksfejl: " + (err.message || err.type), "error");
+        }
+      });
+    }
+
+    function setBabyNightlight(enable) {
+      isNightLightOn = enable;
+      if (isNightLightOn && isBlackoutOn) {
+        setBabyBlackout(false);
+      }
+
+      const fullOverlay = document.getElementById('fullScreenNightlight');
+      const previewOverlay = document.getElementById('babyNightLightOverlay');
+
+      if (isNightLightOn) {
+        fullOverlay.classList.remove('hidden');
+        previewOverlay.classList.remove('hidden');
+      } else {
+        fullOverlay.classList.add('hidden');
+        previewOverlay.classList.add('hidden');
+      }
+
+      syncBabyStateToParent();
+    }
+
+    document.querySelectorAll('.nightlight-color-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const color = e.currentTarget.getAttribute('data-color');
+        const fullOverlay = document.getElementById('fullScreenNightlight');
+        fullOverlay.classList.remove('bg-amber-300', 'text-amber-950', 'bg-rose-900', 'text-rose-100', 'bg-indigo-950', 'text-indigo-100');
+
+        if (color === 'rose') {
+          fullOverlay.classList.add('bg-rose-900', 'text-rose-100');
+        } else if (color === 'indigo') {
+          fullOverlay.classList.add('bg-indigo-950', 'text-indigo-100');
+        } else {
+          fullOverlay.classList.add('bg-amber-300', 'text-amber-950');
+        }
+      });
+    });
+
+    function setBabyBlackout(enable) {
+      isBlackoutOn = enable;
+      if (isBlackoutOn && isNightLightOn) {
+        setBabyNightlight(false);
+      }
+
+      const fullBlackout = document.getElementById('fullScreenBlackout');
+      const previewBlackout = document.getElementById('babyBlackoutOverlay');
+
+      if (isBlackoutOn) {
+        fullBlackout.classList.remove('hidden');
+        previewBlackout.classList.remove('hidden');
+      } else {
+        fullBlackout.classList.add('hidden');
+        previewBlackout.classList.add('hidden');
+      }
+
+      syncBabyStateToParent();
+    }
+
+    function stopAllSleepSounds() {
+      activeSoundIntervals.forEach(id => clearInterval(id));
+      activeSoundIntervals = [];
+
+      activeSoundNodes.forEach(node => {
+        try {
+          if (node.stop) node.stop();
+          if (node.disconnect) node.disconnect();
+        } catch (e) {}
+      });
+      activeSoundNodes = [];
+    }
+
+    function setBabySleepSound(mode) {
+      stopAllSleepSounds();
+      currentSoundMode = mode || "off";
+
+      const label = document.getElementById('localLullabyLabel');
+      const localSelect = document.getElementById('localSoundSelect');
+      if (localSelect && localSelect.value !== currentSoundMode) {
+        localSelect.value = currentSoundMode;
+      }
+
+      const soundNames = {
+        off: "Sovelyd: Fra",
+        womb: "Livmoder-støj",
+        rain: "Blid Regn",
+        waves: "Havbølger",
+        heartbeat: "Hjerteslag",
+        lullaby: "Vuggevise"
+      };
+      label.innerText = soundNames[currentSoundMode] || "Sovelyd: Fra";
+
+      if (currentSoundMode === "off") {
+        syncBabyStateToParent();
+        return;
+      }
+
+      try {
+        if (!whiteNoiseContext) {
+          whiteNoiseContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (whiteNoiseContext.state === 'suspended') {
+          whiteNoiseContext.resume();
+        }
+
+        const ctx = whiteNoiseContext;
+
+        if (currentSoundMode === "womb") {
+          const bufferSize = 2 * ctx.sampleRate;
+          const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          let lastOut = 0.0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            output[i] = (lastOut + (0.02 * white)) / 1.02;
+            lastOut = output[i];
+            output[i] *= 0.3;
+          }
+          const src = ctx.createBufferSource();
+          src.buffer = noiseBuffer;
+          src.loop = true;
+
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.value = 420;
+
+          src.connect(filter);
+          filter.connect(ctx.destination);
+          src.start(0);
+          activeSoundNodes.push(src, filter);
+
+        } else if (currentSoundMode === "rain") {
+          const bufferSize = 3 * ctx.sampleRate;
+          const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.015;
+            b6 = white * 0.115926;
+          }
+          const src = ctx.createBufferSource();
+          src.buffer = noiseBuffer;
+          src.loop = true;
+
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.value = 1400;
+
+          src.connect(filter);
+          filter.connect(ctx.destination);
+          src.start(0);
+          activeSoundNodes.push(src, filter);
+
+        } else if (currentSoundMode === "waves") {
+          const bufferSize = 2 * ctx.sampleRate;
+          const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          let lastOut = 0.0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            output[i] = (lastOut + (0.04 * white)) / 1.04;
+            lastOut = output[i];
+            output[i] *= 0.25;
+          }
+          const src = ctx.createBufferSource();
+          src.buffer = noiseBuffer;
+          src.loop = true;
+
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.value = 500;
+
+          const waveGain = ctx.createGain();
+          waveGain.gain.value = 0.15;
+
+          const lfo = ctx.createOscillator();
+          lfo.type = 'sine';
+          lfo.frequency.value = 0.12;
+
+          const lfoGain = ctx.createGain();
+          lfoGain.gain.value = 0.12;
+
+          const freqLfoGain = ctx.createGain();
+          freqLfoGain.gain.value = 350;
+
+          lfo.connect(lfoGain);
+          lfoGain.connect(waveGain.gain);
+
+          lfo.connect(freqLfoGain);
+          freqLfoGain.connect(filter.frequency);
+
+          src.connect(filter);
+          filter.connect(waveGain);
+          waveGain.connect(ctx.destination);
+
+          src.start(0);
+          lfo.start(0);
+          activeSoundNodes.push(src, lfo, filter, waveGain);
+
+        } else if (currentSoundMode === "heartbeat") {
+          const playBeat = () => {
+            if (currentSoundMode !== "heartbeat") return;
+            const now = ctx.currentTime;
+
+            const makeThump = (timeOffset, freq, vol) => {
+              const osc = ctx.createOscillator();
+              const g = ctx.createGain();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(freq, now + timeOffset);
+              osc.frequency.exponentialRampToValueAtTime(30, now + timeOffset + 0.18);
+
+              g.gain.setValueAtTime(0.001, now + timeOffset);
+              g.gain.linearRampToValueAtTime(vol, now + timeOffset + 0.02);
+              g.gain.exponentialRampToValueAtTime(0.001, now + timeOffset + 0.22);
+
+              osc.connect(g);
+              g.connect(ctx.destination);
+              osc.start(now + timeOffset);
+              osc.stop(now + timeOffset + 0.24);
+            };
+
+            makeThump(0, 65, 0.35);
+            makeThump(0.28, 52, 0.22);
+          };
+
+          playBeat();
+          const intervalId = setInterval(playBeat, 1000);
+          activeSoundIntervals.push(intervalId);
+
+        } else if (currentSoundMode === "lullaby") {
+          const notes = [261.63, 329.63, 392.00, 329.63, 440.00, 392.00, 329.63, 293.66, 349.23, 293.66, 261.63, 261.63];
+          let noteIdx = 0;
+
+          const playNote = () => {
+            if (currentSoundMode !== "lullaby") return;
+            const now = ctx.currentTime;
+            const freq = notes[noteIdx % notes.length];
+            noteIdx++;
+
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+
+            g.gain.setValueAtTime(0.001, now);
+            g.gain.linearRampToValueAtTime(0.08, now + 0.05);
+            g.gain.exponentialRampToValueAtTime(0.0008, now + 1.4);
+
+            osc.connect(g);
+            g.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 1.45);
+          };
+
+          playNote();
+          const intervalId = setInterval(playNote, 900);
+          activeSoundIntervals.push(intervalId);
+        }
+      } catch (e) {
+        console.error("Kunne ikke starte sovelyd:", e);
+      }
+
+      syncBabyStateToParent();
+    }
+
+    function syncBabyStateToParent() {
+      if (dataChannel && dataChannel.open) {
+        dataChannel.send({
+          type: 'stateSync',
+          nightlight: isNightLightOn,
+          blackout: isBlackoutOn,
+          soundMode: currentSoundMode,
+          battery: {
+            level: Math.round(batteryState.level),
+            charging: batteryState.charging,
+            isEstimated: batteryState.isEstimated
+          }
+        });
+      }
+    }
+
+    function handleRemoteBabyCommand(data) {
+      if (data.action === "toggleNightlight") {
+        setBabyNightlight(!isNightLightOn);
+      } else if (data.action === "toggleBlackout") {
+        setBabyBlackout(!isBlackoutOn);
+      } else if (data.action === "flipCamera") {
+        document.getElementById('toggleCameraFlipBtn').click();
+      } else if (data.action === "setSleepSound") {
+        setBabySleepSound(data.soundMode);
+      }
+    }
+
+    document.getElementById('toggleCameraFlipBtn').addEventListener('click', async () => {
+      currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+      await startBabyStream();
+    });
+
+    document.getElementById('toggleNightlightBtn').addEventListener('click', () => {
+      setBabyNightlight(!isNightLightOn);
+    });
+
+    document.getElementById('closeFullNightlightBtn').addEventListener('click', () => {
+      setBabyNightlight(false);
+    });
+
+    const soundCycleOrder = ["off", "womb", "rain", "waves", "heartbeat", "lullaby"];
+    document.getElementById('toggleLullabyLocalBtn').addEventListener('click', () => {
+      const nextIdx = (soundCycleOrder.indexOf(currentSoundMode) + 1) % soundCycleOrder.length;
+      setBabySleepSound(soundCycleOrder[nextIdx]);
+    });
+
+    document.getElementById('localSoundSelect').addEventListener('change', (e) => {
+      setBabySleepSound(e.target.value);
+    });
+
+    document.getElementById('toggleBlackoutBtn').addEventListener('click', () => {
+      setBabyBlackout(!isBlackoutOn);
+    });
+
+    document.getElementById('fullScreenBlackout').addEventListener('click', () => {
+      setBabyBlackout(false);
+    });
+
+    document.getElementById('copyCodeBtn').addEventListener('click', () => {
+      const code = document.getElementById('babyRoomCode').innerText;
+      navigator.clipboard?.writeText(code).catch(() => {});
+      showNotice("Kode: " + code, "info");
+    });
+
+    // =========================================================
+    // ROLLE 2: FORÆLDRE ENHED (Modtager / PC)
+    // =========================================================
+    document.getElementById('selectParentBtn').addEventListener('click', () => {
+      setupParentView();
+    });
+
+    if (joinCodeFromUrl) {
+      setupParentView();
+      document.getElementById('targetPeerIdInput').value = joinCodeFromUrl;
+      setTimeout(() => {
+        document.getElementById('connectToBabyBtn').click();
+      }, 700);
+    }
+
+    function setupParentView() {
+      roleSelectionView.classList.add('hidden');
+      parentView.classList.remove('hidden');
+      updateStatus("Klar til at oprette forbindelse", "slate");
+
+      peer = new Peer(peerConfig);
+      
+      peer.on('open', (id) => {
+        updateStatus("Klar til at oprette forbindelse", "slate");
+      });
+
+      peer.on('error', (err) => {
+        console.error("PeerJS Fejl:", err);
+        setConnectButtonLoading(false);
+
+        if (err.type === 'peer-unavailable') {
+          showNotice("Kunne ikke finde baby-enheden. Tjek koden og at telefonen viser 'Klar til parring!'.", "error");
+        } else {
+          showNotice("Fejl: " + (err.message || err.type), "error");
+        }
+        updateStatus("Forbindelsesfejl", "rose");
+      });
+    }
+
+    function setConnectButtonLoading(loading) {
+      isConnecting = loading;
+      const btn = document.getElementById('connectToBabyBtn');
+      const spinner = document.getElementById('connectBtnSpinner');
+      const text = document.getElementById('connectBtnText');
+
+      if (loading) {
+        spinner.classList.remove('hidden');
+        text.innerText = "Forbinder...";
+        btn.disabled = true;
+        btn.classList.add('opacity-75');
+      } else {
+        spinner.classList.add('hidden');
+        text.innerText = "Forbind";
+        btn.disabled = false;
+        btn.classList.remove('opacity-75');
+      }
+    }
+
+    function createSilentAudioAndVideoDummyStream() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 16;
+      canvas.height = 16;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, 16, 16);
+      const videoStream = canvas.captureStream ? canvas.captureStream(1) : new MediaStream();
+
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const dst = audioCtx.createMediaStreamDestination();
+      const oscillator = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0;
+      oscillator.connect(gain);
+      gain.connect(dst);
+      oscillator.start();
+
+      const combinedStream = new MediaStream([
+        ...videoStream.getVideoTracks(),
+        ...dst.stream.getAudioTracks()
+      ]);
+      return combinedStream;
+    }
+
+    document.getElementById('connectToBabyBtn').addEventListener('click', () => {
+      const rawCode = document.getElementById('targetPeerIdInput').value.trim();
+      if (!rawCode) {
+        showNotice("Indtast venligst den 6-cifrede kode fra telefonen!", "error");
+        return;
+      }
+
+      if (!peer || !peer.open) {
+        showNotice("Signal-serveren klargøres stadig. Prøv igen om 2 sekunder.", "info");
+        return;
+      }
+
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+
+      activeTargetRoomCode = rawCode;
+      setConnectButtonLoading(true);
+      const targetId = `babyvagt-${rawCode}`;
+      updateStatus("Ringer op til baby...", "amber");
+
+      setupParentDataChannel(targetId);
+
+      const dummyStream = createSilentAudioAndVideoDummyStream();
+      const call = peer.call(targetId, dummyStream);
+      currentCall = call;
+
+      const connectTimeout = setTimeout(() => {
+        if (isConnecting) {
+          setConnectButtonLoading(false);
+          showNotice("Forbindelsen tog for lang tid. Tjek at telefonen er tændt og prøv igen.", "error");
+          updateStatus("Timeout", "rose");
+        }
+      }, 10000);
+
+      call.on('stream', (remoteStream) => {
+        clearTimeout(connectTimeout);
+        setConnectButtonLoading(false);
+
+        remoteMediaStream = remoteStream;
+        lastHeartbeatTime = Date.now();
+        setConnectionLostState(false);
+
+        updateStatus("Live forbindelse aktiv!", "emerald");
+        showNotice("Forbundet til baby! Video & lyd modtages.", "success");
+
+        document.getElementById('parentConnectPanel').classList.add('hidden');
+        document.getElementById('parentStreamContainer').classList.remove('hidden');
+
+        const remoteVideo = document.getElementById('remoteVideo');
+        const videoOnlyStream = new MediaStream(remoteStream.getVideoTracks());
+        remoteVideo.srcObject = videoOnlyStream;
+        remoteVideo.muted = true;
+        remoteVideo.play().catch(() => {});
+        
+        setupAudioAnalyzerAndBooster(remoteStream);
+        startConnectionHeartbeatWatcher();
+      });
+
+      call.on('close', () => {
+        clearTimeout(connectTimeout);
+        setConnectButtonLoading(false);
+        setConnectionLostState(true);
+        updateStatus("Baby enhed frakoblet", "rose");
+      });
+
+      call.on('error', (err) => {
+        clearTimeout(connectTimeout);
+        setConnectButtonLoading(false);
+        console.error("Call error:", err);
+        setConnectionLostState(true);
+      });
+    });
+
+    // =========================================================
+    // FORBINDELSESVAGT (HEARTBEAT & AUTO-GENOPRETNING)
+    // =========================================================
+    function startConnectionHeartbeatWatcher() {
+      if (heartbeatCheckInterval) clearInterval(heartbeatCheckInterval);
+
+      heartbeatCheckInterval = setInterval(() => {
+        if (!activeTargetRoomCode) return;
+
+        if (dataChannel && dataChannel.open) {
+          try {
+            dataChannel.send({ type: 'heartbeatPing' });
+          } catch (e) {}
+        }
+
+        const elapsed = Date.now() - lastHeartbeatTime;
+        if (elapsed > 4000) {
+          if (!isDisconnectedState) {
+            setConnectionLostState(true);
+          }
+          attemptAutoReconnect();
+        }
+      }, 2000);
+    }
+
+    function setConnectionLostState(lost) {
+      isDisconnectedState = lost;
+      const banner = document.getElementById('disconnectAlertBanner');
+      const frame = document.getElementById('videoMonitorFrame');
+      const reconnectText = document.getElementById('reconnectStatusText');
+
+      if (lost) {
+        banner.classList.remove('hidden');
+        frame.classList.add('disconnect-alert-frame');
+        updateStatus("Forbindelse mistet - Søger...", "rose");
+        playDisconnectAlertBeep();
+      } else {
+        banner.classList.add('hidden');
+        frame.classList.remove('disconnect-alert-frame');
+        reconnectText.innerText = "Søger efter enhed...";
+      }
+    }
+
+    function attemptAutoReconnect() {
+      if (!activeTargetRoomCode || !peer || peer.disconnected || peer.destroyed) return;
+
+      const targetId = `babyvagt-${activeTargetRoomCode}`;
+      document.getElementById('reconnectStatusText').innerText = "Genopretter forbindelse...";
+
+      try {
+        if (currentCall) {
+          try { currentCall.close(); } catch (e) {}
+        }
+
+        const dummyStream = createSilentAudioAndVideoDummyStream();
+        const newCall = peer.call(targetId, dummyStream);
+        currentCall = newCall;
+
+        setupParentDataChannel(targetId);
+
+        newCall.on('stream', (remoteStream) => {
+          remoteMediaStream = remoteStream;
+          lastHeartbeatTime = Date.now();
+          setConnectionLostState(false);
+          updateStatus("Live forbindelse aktiv!", "emerald");
+
+          const remoteVideo = document.getElementById('remoteVideo');
+          const videoOnlyStream = new MediaStream(remoteStream.getVideoTracks());
+          remoteVideo.srcObject = videoOnlyStream;
+          remoteVideo.muted = true;
+          remoteVideo.play().catch(() => {});
+          
+          setupAudioAnalyzerAndBooster(remoteStream);
+        });
+      } catch (e) {
+        console.warn("Autoreconnect forsøg fejlede:", e);
+      }
+    }
+
+    function playDisconnectAlertBeep() {
+      try {
+        const ctx = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        osc.frequency.setValueAtTime(330, ctx.currentTime + 0.2);
+
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+      } catch (e) {}
+    }
+
+    function updateParentBatteryUI(bat) {
+      if (!bat) return;
+      const badge = document.getElementById('remoteBatteryBadge');
+      const textEl = document.getElementById('remoteBatteryText');
+      const footerInfo = document.getElementById('parentFooterBatteryInfo');
+      if (!badge || !textEl) return;
+
+      const pct = bat.level;
+      const prefix = bat.isEstimated ? '~' : '';
+
+      if (bat.charging) {
+        textEl.innerText = `Oplader ⚡`;
+        badge.className = "bg-slate-900/90 backdrop-blur text-emerald-400 border border-emerald-500/40 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-lg";
+        if (footerInfo) footerInfo.innerText = `Telefon strøm: Tilsluttet oplader ⚡`;
+      } else {
+        textEl.innerText = `${prefix}${pct}%`;
+        if (footerInfo) {
+          footerInfo.innerText = `Telefon batteri: ${prefix}${pct}% ${bat.isEstimated ? '(iOS estimat)' : ''}`;
+        }
+
+        if (pct <= 20) {
+          badge.className = "bg-rose-950/90 backdrop-blur text-rose-300 border border-rose-500 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-lg animate-pulse";
+          if (!lowBatteryAlertShown) {
+            lowBatteryAlertShown = true;
+            showNotice(`Advarsel: Lavt batteri på babyens telefon (${prefix}${pct}%)! Sæt gerne oplader i.`, "error");
+          }
+        } else if (pct <= 40) {
+          badge.className = "bg-slate-900/90 backdrop-blur text-amber-400 border border-amber-500/40 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-lg";
+        } else {
+          badge.className = "bg-slate-900/90 backdrop-blur text-emerald-400 border border-slate-700/80 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-lg";
+        }
+      }
+    }
+
+    function setupParentDataChannel(targetId) {
+      try {
+        dataChannel = peer.connect(targetId, { reliable: true });
+        dataChannel.on('open', () => {
+          lastHeartbeatTime = Date.now();
+        });
+        dataChannel.on('data', (data) => {
+          if (!data) return;
+          lastHeartbeatTime = Date.now();
+          if (isDisconnectedState) {
+            setConnectionLostState(false);
+          }
+
+          if (data.type === 'heartbeatPong') {
+            return;
+          }
+
+          if (data.type === 'audioLevel') {
+            remoteVolumeFromDataChannel = data.level || 0;
+            return;
+          }
+
+          if (data.type === 'stateSync') {
+            const nlBadge = document.getElementById('remoteNightlightStatusBadge');
+            const boBadge = document.getElementById('remoteBlackoutStatusBadge');
+            const wnBadge = document.getElementById('remoteNoiseStatusBadge');
+            const wnText = document.getElementById('remoteNoiseBadgeText');
+            const remoteSelect = document.getElementById('remoteSoundSelect');
+
+            nlBadge.classList.toggle('hidden', !data.nightlight);
+            boBadge.classList.toggle('hidden', !data.blackout);
+
+            const isPlayingSound = data.soundMode && data.soundMode !== 'off';
+            wnBadge.classList.toggle('hidden', !isPlayingSound);
+
+            const modeLabels = {
+              womb: "Livmoder-støj",
+              rain: "Blid Regn",
+              waves: "Havbølger",
+              heartbeat: "Hjerteslag",
+              lullaby: "Vuggevise"
+            };
+            if (isPlayingSound && wnText) {
+              wnText.innerText = modeLabels[data.soundMode] || "Sovelyd spiller";
+            }
+            if (remoteSelect && data.soundMode) {
+              remoteSelect.value = data.soundMode;
+            }
+
+            if (data.battery) {
+              updateParentBatteryUI(data.battery);
+            }
+          }
+        });
+      } catch (e) {
+        console.warn("Kunne ikke oprette datakanal:", e);
+      }
+    }
+
+    document.getElementById('unlockAudioOverlayBtn').addEventListener('click', () => {
+      if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+      applyCurrentAudioGainAndMute();
+      document.getElementById('unlockAudioOverlayBtn').classList.add('hidden');
+    });
+
+    function applyCurrentAudioGainAndMute() {
+      const shouldSilence = isMuted || currentGainValue === 0;
+
+      if (remoteMediaStream) {
+        remoteMediaStream.getAudioTracks().forEach(track => {
+          track.enabled = !shouldSilence;
+        });
+      }
+
+      if (webrtcAudioPumpElement) {
+        if (shouldSilence) {
+          webrtcAudioPumpElement.pause();
+          webrtcAudioPumpElement.muted = true;
+        } else {
+          webrtcAudioPumpElement.muted = false;
+          webrtcAudioPumpElement.volume = Math.min(1.0, currentGainValue);
+          webrtcAudioPumpElement.play().catch(() => {});
+        }
+      }
+
+      if (!gainNode || !audioContext) return;
+
+      if (shouldSilence) {
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        try { gainNode.disconnect(); } catch (e) {}
+      } else {
+        const extraBoost = Math.max(0, currentGainValue - 1.0);
+        gainNode.gain.setValueAtTime(extraBoost, audioContext.currentTime);
+        try {
+          gainNode.disconnect();
+          if (extraBoost > 0) {
+            gainNode.connect(audioContext.destination);
+          }
+        } catch (e) {}
+      }
+    }
+
+    function setupAudioAnalyzerAndBooster(stream) {
+      try {
+        if (!stream.getAudioTracks().length) {
+          showNotice("Advarsel: Intet lydspor modtaget fra telefonen.", "error");
+          return;
+        }
+
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+          audioContext.resume().catch(() => {
+            document.getElementById('unlockAudioOverlayBtn').classList.remove('hidden');
+          });
+        }
+
+        const audioOnlyStream = new MediaStream(stream.getAudioTracks());
+
+        if (!webrtcAudioPumpElement) {
+          webrtcAudioPumpElement = new Audio();
+          webrtcAudioPumpElement.autoplay = true;
+          webrtcAudioPumpElement.playsInline = true;
+        }
+        webrtcAudioPumpElement.srcObject = audioOnlyStream;
+
+        const source = audioContext.createMediaStreamSource(audioOnlyStream);
+        analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 512;
+        analyserNode.smoothingTimeConstant = 0.4;
+
+        gainNode = audioContext.createGain();
+
+        source.connect(analyserNode);
+        source.connect(gainNode);
+        applyCurrentAudioGainAndMute();
+
+        const timeData = new Uint8Array(analyserNode.fftSize);
+        const volumeBar = document.getElementById('volumeBar');
+        const decibelLabel = document.getElementById('decibelLabel');
+
+        function checkAudioVolume() {
+          if (!analyserNode) return;
+
+          analyserNode.getByteTimeDomainData(timeData);
+          let sumSquares = 0.0;
+          for (let i = 0; i < timeData.length; i++) {
+            const normalized = (timeData[i] - 128) / 128.0;
+            sumSquares += normalized * normalized;
+          }
+          const rms = Math.sqrt(sumSquares / timeData.length);
+          const localCalcPercent = Math.min(100, Math.round(rms * 320));
+
+          const volumePercent = Math.max(localCalcPercent, remoteVolumeFromDataChannel);
+
+          volumeBar.style.width = volumePercent + '%';
+          decibelLabel.innerText = volumePercent + '%';
+
+          if (volumePercent >= soundThreshold) {
+            volumeBar.className = "h-full bg-rose-500 transition-all duration-75";
+            triggerCryingAlarm(volumePercent);
+          } else if (volumePercent > soundThreshold * 0.7) {
+            volumeBar.className = "h-full bg-amber-400 transition-all duration-75";
+          } else {
+            volumeBar.className = "h-full bg-emerald-500 transition-all duration-75";
+          }
+
+          requestAnimationFrame(checkAudioVolume);
+        }
+
+        checkAudioVolume();
+      } catch (err) {
+        console.error("Lydanalyse fejl:", err);
+      }
+    }
+
+    function triggerCryingAlarm(level) {
+      const nowStr = new Date().toLocaleTimeString('da-DK');
+      document.getElementById('lastActivityLog').innerText = `Lyd på ${level}% kl. ${nowStr}`;
+
+      const frame = document.getElementById('videoMonitorFrame');
+      frame.classList.add('border-rose-500', 'crying-alert');
+
+      if (alarmCooldown) return;
+      alarmCooldown = true;
+
+      const banner = document.getElementById('alarmBanner');
+      banner.classList.remove('-translate-y-32');
+      banner.classList.add('translate-y-0');
+
+      const beepEnabled = document.getElementById('enableAlarmBeepCheckbox').checked;
+      if (beepEnabled) {
+        playAlertChimeOnPC();
+      }
+
+      setTimeout(() => {
+        alarmCooldown = false;
+        frame.classList.remove('border-rose-500', 'crying-alert');
+      }, 3500);
+    }
+
+    document.getElementById('dismissAlarmBtn').addEventListener('click', () => {
+      const banner = document.getElementById('alarmBanner');
+      banner.classList.add('-translate-y-32');
+      banner.classList.remove('translate-y-0');
+    });
+
+    function playAlertChimeOnPC() {
+      try {
+        const ctx = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.45);
+      } catch(e) {}
+    }
+
+    const audioGainSlider = document.getElementById('audioGainSlider');
+    const gainValueLabel = document.getElementById('gainValueLabel');
+    const muteAudioBtn = document.getElementById('muteAudioBtn');
+
+    audioGainSlider.addEventListener('input', (e) => {
+      const pct = parseInt(e.target.value);
+      currentGainValue = pct / 100;
+      gainValueLabel.innerText = pct + '%';
+
+      if (pct === 0) {
+        isMuted = true;
+      } else {
+        isMuted = false;
+      }
+
+      if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+      applyCurrentAudioGainAndMute();
+      updateMuteButtonUI();
+    });
+
+    muteAudioBtn.addEventListener('click', () => {
+      isMuted = !isMuted;
+      if (!isMuted && currentGainValue === 0) {
+        currentGainValue = 1.0;
+        audioGainSlider.value = 100;
+        gainValueLabel.innerText = "100%";
+      }
+      if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+      applyCurrentAudioGainAndMute();
+      updateMuteButtonUI();
+    });
+
+    function updateMuteButtonUI() {
+      if (isMuted) {
+        muteAudioBtn.className = "w-full py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 border border-rose-500/30 transition cursor-pointer";
+        muteAudioBtn.innerHTML = `<i data-lucide="volume-x" class="w-4 h-4"></i> Medhør er Muted (Klik for at lytte)`;
+      } else {
+        muteAudioBtn.className = "w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 border border-emerald-500/30 transition cursor-pointer";
+        muteAudioBtn.innerHTML = `<i data-lucide="volume-2" class="w-4 h-4"></i> Medhør er Aktivt (Klik for Mute)`;
+      }
+      lucide.createIcons();
+    }
+
+    const sensitivitySlider = document.getElementById('sensitivitySlider');
+    const thresholdMarker = document.getElementById('thresholdMarker');
+    const thresholdValueText = document.getElementById('thresholdValueText');
+    const thresholdInlineText = document.getElementById('thresholdInlineText');
+
+    sensitivitySlider.addEventListener('input', (e) => {
+      soundThreshold = parseInt(e.target.value);
+      thresholdMarker.style.left = soundThreshold + '%';
+      thresholdValueText.innerText = soundThreshold + '%';
+      thresholdInlineText.innerText = soundThreshold + '%';
+    });
+
+    function sendCommandToBaby(payload) {
+      const rawCode = document.getElementById('targetPeerIdInput').value.trim();
+      const targetId = `babyvagt-${rawCode}`;
+
+      if (dataChannel && dataChannel.open) {
+        dataChannel.send(payload);
+      } else if (peer && rawCode) {
+        dataChannel = peer.connect(targetId, { reliable: true });
+        dataChannel.on('open', () => {
+          dataChannel.send(payload);
+        });
+      } else {
+        showNotice("Forbindelse til telefonens kontrolkanal ikke klar.", "info");
+      }
+    }
+
+    document.getElementById('remoteNightlightBtn').addEventListener('click', () => {
+      sendCommandToBaby({ action: "toggleNightlight" });
+    });
+
+    document.getElementById('remoteBlackoutBtn').addEventListener('click', () => {
+      sendCommandToBaby({ action: "toggleBlackout" });
+    });
+
+    document.getElementById('remoteSoundSelect').addEventListener('change', (e) => {
+      sendCommandToBaby({ action: "setSleepSound", soundMode: e.target.value });
+    });
+
+    document.getElementById('remoteFlipCameraBtn').addEventListener('click', () => {
+      sendCommandToBaby({ action: "flipCamera" });
+    });
+
+    document.getElementById('fullscreenBtn').addEventListener('click', () => {
+      const container = document.getElementById('videoMonitorFrame');
+      if (!document.fullscreenElement) {
+        container.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+
+    const pushToTalkBtn = document.getElementById('pushToTalkBtn');
+    const pttLabel = document.getElementById('pttLabel');
+
+    async function startPushToTalk() {
+      const rawCode = document.getElementById('targetPeerIdInput').value.trim();
+      if (!peer || !rawCode) return;
+
+      try {
+        pttLabel.innerText = "Taler til baby... (Slip for at stoppe)";
+        pushToTalkBtn.classList.add('bg-indigo-600', 'text-white');
+
+        if (gainNode) {
+          try { gainNode.disconnect(); } catch (e) {}
+        }
+
+        pttStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        pttCall = peer.call(`babyvagt-${rawCode}`, pttStream, { metadata: { type: 'intercom' } });
+      } catch (err) {
+        showNotice("Kunne ikke åbne mikrofon på PC til Push-to-Talk.", "error");
+        stopPushToTalk();
+      }
+    }
+
+    function stopPushToTalk() {
+      pttLabel.innerText = "Hold nede for at tale til baby";
+      pushToTalkBtn.classList.remove('bg-indigo-600', 'text-white');
+
+      if (pttStream) {
+        pttStream.getTracks().forEach(t => t.stop());
+        pttStream = null;
+      }
+      if (pttCall) {
+        pttCall.close();
+        pttCall = null;
+      }
+
+      applyCurrentAudioGainAndMute();
+    }
+
+    pushToTalkBtn.addEventListener('mousedown', startPushToTalk);
+    pushToTalkBtn.addEventListener('mouseup', stopPushToTalk);
+    pushToTalkBtn.addEventListener('mouseleave', () => { if (pttStream) stopPushToTalk(); });
+    pushToTalkBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startPushToTalk(); });
+    pushToTalkBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopPushToTalk(); });
+
+    function updateStatus(text, color) {
+      statusText.innerText = text;
+      const colorMap = {
+        emerald: "bg-emerald-500",
+        amber: "bg-amber-400",
+        rose: "bg-rose-500",
+        indigo: "bg-indigo-400",
+        slate: "bg-slate-500"
+      };
+      connectionStatusBadge.querySelector('span:first-child').className = `w-2 h-2 rounded-full ${colorMap[color] || 'bg-slate-400'} animate-pulse`;
+    }
+  </script>
+</body>
+</html>
