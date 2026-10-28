@@ -108,6 +108,7 @@ footer{padding:12px;text-align:center;font-size:12px;color:var(--mut)}
     <div id="streamBox" class="hide">
       <div id="frame" class="frame">
         <video id="rv" autoplay playsinline muted></video>
+        <div id="vwait" class="cover hide" style="background:rgba(2,6,23,.92);cursor:pointer"><p id="vmsg"></p></div>
         <button id="unlock" class="ab hide" data-i="unlock"></button>
         <div id="lost" class="cover hide"><h2 data-i="lostT"></h2><p data-i="lostD"></p></div>
         <div id="alarm" class="cover hide"><h2 data-i="alT"></h2><p data-i="alD"></p><button id="dis" class="p" data-i="dis"></button></div>
@@ -158,7 +159,7 @@ joinT:'Forbind til baby-enhed',joinD:'Indtast koden fra babyens telefon:',conn:'
 alT:'LYD OVER GRÆNSEN!',alD:'Der er registreret vedvarende lyd på babyværelset.',dis:'Afvis',mic:'Lyd fra babyværelset:',boost:'Lydstyrke / boost',spkOn:'🔊 Højttaler tændt',spkOff:'🔇 Højttaler slukket',
 vox:'Gråde-tærskel',voxD:'Alarm ved vedvarende lyd over den røde streg.',beepL:'Bip ved alarm',remote:'Fjernstyring',ptt:'Hold for at tale',pttOn:'Taler…',last:'Seneste hændelse:',none:'Ingen endnu',unlock:'Tryk for at aktivere lyd',
 stIdle:'Vælg enhed',stWait:'Afventer kamera',stReq:'Anmoder om kamera…',stReady:'Klar til parring',stParent:'Forælder tilsluttet',stDenied:'Adgang afvist',stCalling:'Forbinder…',stLive:'Live',stLost:'Forbindelse mistet',stErr:'Fejl',
-denied:'Kunne ikke få adgang til kamera/mikrofon.',https:'Siden kører ikke over HTTPS – kamera og mikrofon virker ikke.',badCode:'Ugyldig kode.',nf:'Baby-enheden blev ikke fundet.',to:'Timeout – prøv igen.',lowBat:'Babytelefonens batteri er lavt!'},
+denied:'Kunne ikke få adgang til kamera/mikrofon.',https:'Siden kører ikke over HTTPS – kamera og mikrofon virker ikke.',badCode:'Ugyldig kode.',nf:'Baby-enheden blev ikke fundet.',to:'Timeout – prøv igen.',lowBat:'Babytelefonens batteri er lavt!',vWait:'Venter på video…',vNo:'Ingen video endnu. Tryk for at prøve igen. Forbindelsestilstand:'},
 en:{sub:'P2P browser baby monitor',pick:'Select device type',pickD:'Both devices open this page in a browser (HTTPS).',baby:'Baby device',babyD:"The phone in the baby's room. Streams video and audio.",parent:'Parent device',parentD:'The device you listen on and get alerts on.',
 priv:'Privacy: Video and audio go encrypted directly between devices (WebRTC). The connection is set up via PeerJS and Google servers, which can see IP addresses. Only devices with your private code can connect, one parent at a time.',
 permT:'Permission required',permD:'The browser needs camera and microphone access.',permB:'Grant access',scan:'Scan the QR code on the parent device, or enter the code:',codeL:'Code:',copy:'Copy',newCode:'New code',
@@ -168,7 +169,7 @@ joinT:'Connect to baby device',joinD:"Enter the code shown on the baby's phone:"
 alT:'NOISE OVER LIMIT!',alD:"Sustained noise detected in the baby's room.",dis:'Dismiss',mic:"Sound from baby's room:",boost:'Volume / boost',spkOn:'🔊 Speaker on',spkOff:'🔇 Speaker off',
 vox:'Cry threshold',voxD:'Alarm on sustained sound above the red line.',beepL:'Beep on alarm',remote:'Remote control',ptt:'Hold to talk',pttOn:'Talking…',last:'Last event:',none:'None yet',unlock:'Tap to enable audio',
 stIdle:'Choose device',stWait:'Waiting for camera',stReq:'Requesting camera…',stReady:'Ready to pair',stParent:'Parent connected',stDenied:'Access denied',stCalling:'Connecting…',stLive:'Live',stLost:'Connection lost',stErr:'Error',
-denied:'Could not access camera/microphone.',https:'Page is not served over HTTPS – camera and microphone will not work.',badCode:'Invalid code.',nf:'Baby device not found.',to:'Timeout – try again.',lowBat:"Baby phone's battery is low!"}
+denied:'Could not access camera/microphone.',https:'Page is not served over HTTPS – camera and microphone will not work.',badCode:'Invalid code.',nf:'Baby device not found.',to:'Timeout – try again.',lowBat:"Baby phone's battery is low!",vWait:'Waiting for video…',vNo:'No video yet. Tap to retry. Connection state:'}
 };
 const $=id=>document.getElementById(id);
 let lang=localStorage.getItem('bba-lang')||(navigator.language.startsWith('da')?'da':'en');
@@ -353,6 +354,7 @@ function setSound(m){
 }
 
 /* ---------- PARENT ---------- */
+let ice='new',callAt=0,videoOk=false;
 let target=null,pcall=null,pconn=null,rStream=null,lastHb=0,lost=false,hb=null,lastTry=0,connecting=false,lostT=null;
 let pump=null,src=null,an=null,gn=null,comp=null,loopOn=false,dummyS=null;
 let gain=150,muted=false,thr=35,rLevel=0,lvAt=0,alarmOn=false,alarmT=null,alarmN=0,lowShown=false,pttS=null,pttC=null;
@@ -394,7 +396,7 @@ function connect(){
 function dial(){
   const old=pcall,oc=pconn;pcall=null;pconn=null;
   try{old&&old.close()}catch(e){}try{oc&&oc.close()}catch(e){}
-  const c=peer.call(target,dummy());pcall=c;
+  const c=peer.call(target,dummy());pcall=c;callAt=Date.now();videoOk=false;ice='new';watchIce(c);
   const dc=peer.connect(target,{reliable:true});pconn=dc;
   dc.on('open',()=>{lastHb=Date.now()});
   dc.on('data',onData);
@@ -403,15 +405,30 @@ function dial(){
     busy(false);rStream=s;lastHb=Date.now();setLost(false);setStatus(t('stLive'),'ok');
     $('joinCard').classList.add('hide');$('streamBox').classList.remove('hide');
     const v=$('rv');v.srcObject=s;v.muted=true;v.play().catch(()=>{});
-    wire(s);startHb();
+    ['playing','resize','loadedmetadata'].forEach(ev=>v.addEventListener(ev,chk));
+    if(!videoOk){$('vwait').classList.remove('hide');$('vmsg').textContent=t('vWait')}
+    watchIce(c);wire(s);startHb();
   });
   c.on('close',()=>{if(pcall===c&&!lost)setLost(true)});
 }
+function watchIce(c){
+  const q=c.peerConnection;if(!q||c._w)return;c._w=1;ice=q.iceConnectionState;
+  q.addEventListener('iceconnectionstatechange',()=>{if(pcall===c)ice=q.iceConnectionState});
+}
+function chk(){const v=$('rv');if(v.videoWidth>0&&!v.paused){videoOk=true;$('vwait').classList.add('hide')}}
+$('vwait').onclick=()=>{ensureAudio();$('rv').play().catch(()=>{});if(pump)pump.play().catch(()=>{});chk()};
 function startHb(){
   clearInterval(hb);
   hb=setInterval(()=>{
-    send(pconn,{type:'ping'});
+    send(pconn,{type:'ping'});chk();
     if(Date.now()-lastHb>6000){if(!lost)setLost(true);retry()}
+    // PeerJS uses a separate RTCPeerConnection for media, so data can work while video does not
+    if(ice==='failed'){if(!lost)setLost(true);retry()}
+    if(!videoOk){
+      $('vwait').classList.remove('hide');
+      if(Date.now()-callAt>8000)$('vmsg').textContent=t('vNo')+' '+ice;
+      if(Date.now()-callAt>15000)retry();
+    }
   },2000);
 }
 function retry(){
