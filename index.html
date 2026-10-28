@@ -113,7 +113,7 @@ footer{padding:12px;text-align:center;font-size:12px;color:var(--mut)}
         <div id="lost" class="cover hide"><h2 data-i="lostT"></h2><p data-i="lostD"></p></div>
         <div id="alarm" class="cover hide"><h2 data-i="alT"></h2><p data-i="alD"></p><button id="dis" class="p" data-i="dis"></button></div>
         <div class="tr row">
-          <span id="rbat" class="badge">--</span><span id="bN" class="badge hide">☀️</span><span id="bD" class="badge hide">🌑</span><span id="bS" class="badge hide">🎵</span>
+          <span id="iceB" class="badge">ICE: –</span><span id="rbat" class="badge">--</span><span id="bN" class="badge hide">☀️</span><span id="bD" class="badge hide">🌑</span><span id="bS" class="badge hide">🎵</span>
           <button id="fs" aria-label="Fullscreen">⛶</button>
         </div>
         <div class="bt">
@@ -385,21 +385,25 @@ function dummy(){   // PeerJS needs a local stream so the offer contains audio+v
 }
 $('go').onclick=connect;
 $('inp').onkeydown=e=>{if(e.key==='Enter')connect()};
-function connect(){
+async function connect(){
   const code=norm($('inp').value);
   if(code.length!==10||!peer||!peer.open)return note(t('badCode'),'bad');
   target=pid(code);busy(true);setStatus(t('stCalling'),'warn');ensureAudio();
   if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});
+  // Granting mic permission lets the browser expose real LAN addresses instead of mDNS names (helps phone-to-phone on Wi-Fi)
+  try{const m=await navigator.mediaDevices.getUserMedia({audio:true});m.getTracks().forEach(x=>x.stop())}catch(e){}
   dial();
   setTimeout(()=>{if(connecting){busy(false);note(t('to'),'bad');setStatus(t('stErr'),'bad')}},12000);
 }
-function dial(){
-  const old=pcall,oc=pconn;pcall=null;pconn=null;
+function dial(keep){   // keep=true: only redo the media call, leave a healthy data connection alone
+  const old=pcall,oc=keep?null:pconn;pcall=null;if(!keep)pconn=null;
   try{old&&old.close()}catch(e){}try{oc&&oc.close()}catch(e){}
   const c=peer.call(target,dummy());pcall=c;callAt=Date.now();videoOk=false;ice='new';watchIce(c);
-  const dc=peer.connect(target,{reliable:true});pconn=dc;
-  dc.on('open',()=>{lastHb=Date.now()});
-  dc.on('data',onData);
+  if(!keep){
+    const dc=peer.connect(target,{reliable:true});pconn=dc;
+    dc.on('open',()=>{lastHb=Date.now()});
+    dc.on('data',onData);
+  }
   c.on('stream',s=>{
     if(pcall!==c)return;
     busy(false);rStream=s;lastHb=Date.now();setLost(false);setStatus(t('stLive'),'ok');
@@ -413,7 +417,7 @@ function dial(){
 }
 function watchIce(c){
   const q=c.peerConnection;if(!q||c._w)return;c._w=1;ice=q.iceConnectionState;
-  q.addEventListener('iceconnectionstatechange',()=>{if(pcall===c)ice=q.iceConnectionState});
+  const u=()=>{if(pcall===c){ice=q.iceConnectionState;$('iceB').textContent='ICE: '+ice}};u();q.addEventListener('iceconnectionstatechange',u);
 }
 function chk(){const v=$('rv');if(v.videoWidth>0&&!v.paused){videoOk=true;$('vwait').classList.add('hide')}}
 $('vwait').onclick=()=>{ensureAudio();$('rv').play().catch(()=>{});if(pump)pump.play().catch(()=>{});chk()};
@@ -423,19 +427,19 @@ function startHb(){
     send(pconn,{type:'ping'});chk();
     if(Date.now()-lastHb>6000){if(!lost)setLost(true);retry()}
     // PeerJS uses a separate RTCPeerConnection for media, so data can work while video does not
-    if(ice==='failed'){if(!lost)setLost(true);retry()}
+    if(ice==='failed'){if(!lost)setLost(true);retry(true)}
     if(!videoOk){
       $('vwait').classList.remove('hide');
       if(Date.now()-callAt>8000)$('vmsg').textContent=t('vNo')+' '+ice;
-      if(Date.now()-callAt>15000)retry();
+      if(Date.now()-callAt>15000)retry(true);
     }
   },2000);
 }
-function retry(){
+function retry(keep){
   if(!peer||peer.destroyed||Date.now()-lastTry<5000)return;
   lastTry=Date.now();
   if(peer.disconnected){peer.reconnect();return}
-  dial();
+  dial(!!(keep&&pconn&&pconn.open&&Date.now()-lastHb<6000));
 }
 function setLost(l){
   if(l===lost)return;lost=l;
