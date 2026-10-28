@@ -650,7 +650,7 @@
         }
       });
       document.documentElement.lang = lang;
-      updateMuteButtonUI(); // Update dynamic UI texts
+      updateMuteButtonUI(); 
     }
 
     document.getElementById('languageSelector').addEventListener('change', (e) => {
@@ -679,6 +679,8 @@
     let audioContext = null;
     let analyserNode = null;
     let gainNode = null;
+    let currentAudioSourceNode = null;
+    let isVolumeLoopRunning = false;
     let wakeLock = null;
 
     let currentFacingMode = "environment";
@@ -704,6 +706,7 @@
     let pttStream = null;
     let pttCall = null;
     let lowBatteryAlertShown = false;
+    let lastReconnectAttempt = 0;
 
     // Forbindelsesvagt (Heartbeat / Disconnect state)
     let lastHeartbeatTime = Date.now();
@@ -984,6 +987,11 @@
           initBabyPeer();
         }
       });
+
+      // HVIS BABY MISTER SERVER-FORBINDELSE SÅ RE-CONNECT AUTOMATISK
+      peer.on('disconnected', () => {
+        if (!peer.destroyed) peer.reconnect();
+      });
     }
 
     function setBabyNightlight(enable) {
@@ -1214,6 +1222,11 @@
         setConnectButtonLoading(false);
         updateStatus("Error", "rose");
       });
+      
+      // HVIS FORÆLDRE MISTER SERVER-FORBINDELSE
+      peer.on('disconnected', () => {
+        if (!peer.destroyed) peer.reconnect();
+      });
     }
 
     function setConnectButtonLoading(loading) {
@@ -1282,8 +1295,9 @@
         document.getElementById('parentStreamContainer').classList.remove('hidden');
 
         const remoteVideo = document.getElementById('remoteVideo');
-        remoteVideo.srcObject = new MediaStream(remoteStream.getVideoTracks());
+        remoteVideo.srcObject = remoteStream;
         remoteVideo.muted = true;
+        remoteVideo.load();
         remoteVideo.play().catch(() => {});
         
         setupAudioAnalyzerAndBooster(remoteStream);
@@ -1301,7 +1315,7 @@
     });
 
     // =========================================================
-    // FORBINDELSESVAGT
+    // FORBINDELSESVAGT & GENOPRETNING (RECONNECT)
     // =========================================================
     function startConnectionHeartbeatWatcher() {
       if (heartbeatCheckInterval) clearInterval(heartbeatCheckInterval);
@@ -1332,10 +1346,18 @@
     }
 
     function attemptAutoReconnect() {
-      if (!activeTargetRoomCode || !peer || peer.disconnected || peer.destroyed) return;
+      if (!activeTargetRoomCode || !peer || peer.destroyed) return;
+      
+      // Throttle: Forsøg kun at genoprette hvert 5. sekund så browseren ikke låser
+      if (Date.now() - lastReconnectAttempt < 5000) return;
+      lastReconnectAttempt = Date.now();
+
+      if (peer.disconnected) { peer.reconnect(); return; }
+
       const targetId = `bbalarm-${activeTargetRoomCode}`;
       try {
         if (currentCall) { try { currentCall.close(); } catch (e) {} }
+        
         const newCall = peer.call(targetId, createSilentAudioAndVideoDummyStream());
         currentCall = newCall;
         setupParentDataChannel(targetId);
@@ -1347,8 +1369,18 @@
           updateStatus(t('dynLive'), "emerald");
 
           const remoteVideo = document.getElementById('remoteVideo');
-          remoteVideo.srcObject = new MediaStream(remoteStream.getVideoTracks());
-          remoteVideo.muted = true; remoteVideo.play().catch(() => {});
+          
+          // NULSTIL video src først for at undgå den sorte skærm
+          remoteVideo.srcObject = null;
+          
+          // Vent 100ms og sæt den nye stream på
+          setTimeout(() => {
+            remoteVideo.srcObject = remoteStream;
+            remoteVideo.muted = true;
+            remoteVideo.load();
+            remoteVideo.play().catch(() => {});
+          }, 100);
+          
           setupAudioAnalyzerAndBooster(remoteStream);
         });
       } catch (e) {}
@@ -1444,10 +1476,19 @@
         if (!webrtcAudioPumpElement) { webrtcAudioPumpElement = new Audio(); webrtcAudioPumpElement.autoplay = true; webrtcAudioPumpElement.playsInline = true; }
         webrtcAudioPumpElement.srcObject = audioOnlyStream;
 
-        const source = audioContext.createMediaStreamSource(audioOnlyStream);
-        analyserNode = audioContext.createAnalyser(); analyserNode.fftSize = 512;
-        gainNode = audioContext.createGain();
-        source.connect(analyserNode); source.connect(gainNode);
+        if (currentAudioSourceNode) {
+          try { currentAudioSourceNode.disconnect(); } catch(e) {}
+        }
+        currentAudioSourceNode = audioContext.createMediaStreamSource(audioOnlyStream);
+
+        if (!analyserNode) {
+          analyserNode = audioContext.createAnalyser(); 
+          analyserNode.fftSize = 512;
+          gainNode = audioContext.createGain();
+        }
+        
+        currentAudioSourceNode.connect(analyserNode); 
+        currentAudioSourceNode.connect(gainNode);
         applyCurrentAudioGainAndMute();
 
         const timeData = new Uint8Array(analyserNode.fftSize);
@@ -1471,7 +1512,11 @@
           else volumeBar.className = "h-full bg-emerald-500 transition-all duration-75";
           requestAnimationFrame(checkAudioVolume);
         }
-        checkAudioVolume();
+        
+        if (!isVolumeLoopRunning) {
+          isVolumeLoopRunning = true;
+          checkAudioVolume();
+        }
       } catch (err) {}
     }
 
