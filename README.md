@@ -15,10 +15,7 @@ A baby monitor that runs entirely in the browser. Put one phone in the baby's ro
 ## Quick start (GitHub Pages)
 
 Camera and microphone access require **HTTPS** (or `localhost`). The easiest way to get HTTPS is GitHub Pages:
-
-1. Fork or upload this repository to your GitHub account.
-2. **Settings → Pages →** deploy from the `main` branch, root folder.
-3. Open `https://<your-user>.github.io/<repo>/` on both devices.
+Open `https://mikkel93-code.github.io/BrowserBabyAlarm/` on both devices.
 
 **Baby phone:** tap *Baby device* → *Grant access*. A QR code and a code appear.
 **Parent device:** tap *Parent device*, scan the QR code or type the code, and optionally give the device a name.
