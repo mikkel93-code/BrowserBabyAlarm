@@ -4,9 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BrowserBabyAlarm</title>
-<!-- Pin versions. For production, self-host these files (or cache them with a service worker) and add SRI hashes. -->
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- Libraries are self-hosted in lib/ (no CDN). The CSP below only allows this site's scripts and the PeerJS signalling server;
+     if you self-host a PeerJS server, add its address to connect-src. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#020617">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<script src="lib/peerjs.min.js"></script>
+<script src="lib/qrcode.min.js"></script>
 <style>
 :root{--bg:#020617;--card:#0f172a;--line:#1e293b;--fg:#f1f5f9;--mut:#a3b1c6;--ok:#34d399;--warn:#fbbf24;--bad:#f43f5e}
 *{box-sizing:border-box}
@@ -28,6 +34,7 @@ select,input[type=text],input:not([type]){background:#020617;border:1px solid #3
 .mut{color:var(--mut);font-size:13px}.mono{font-family:ui-monospace,monospace;letter-spacing:.1em}
 .badge{display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border-radius:99px;background:#1e293b;border:1px solid #334155;font-size:12px}
 .badge.bad{border-color:var(--bad);color:#fecdd3}
+.badge.ok{border-color:var(--ok);color:#a7f3d0}.badge.warn{border-color:var(--warn);color:#fde68a}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--mut);display:inline-block}
 video{width:100%;aspect-ratio:16/9;background:#000;border-radius:16px;object-fit:cover;display:block}
 .bar{height:14px;background:#1e293b;border-radius:8px;position:relative;overflow:hidden}
@@ -45,6 +52,7 @@ video{width:100%;aspect-ratio:16/9;background:#000;border-radius:16px;object-fit
 @keyframes pl{50%{background:rgba(244,63,94,.35)}}
 .alert{animation:pl .8s infinite;border-color:var(--bad)}
 #ptt{touch-action:none;user-select:none}
+.rb{display:block;width:100%;text-align:left;margin-bottom:6px}.rb b{display:block}.rb span{font-size:12px;color:var(--mut)}.rb.on{background:#4f46e5}.rb.on span{color:#e0e7ff}
 footer{padding:12px;text-align:center;font-size:12px;color:var(--mut)}
 </style>
 </head>
@@ -97,6 +105,13 @@ footer{padding:12px;text-align:center;font-size:12px;color:var(--mut)}
       <span data-i="snd"></span><select id="snd"></select>
       <span id="batBox" class="row"><span data-i="bat"></span><select id="batSel"></select></span>
     </div>
+    <div id="devCard" class="card">
+      <div class="row spread"><b data-i="devT"></b><span id="wnow" class="mut"></span></div>
+      <div id="devl" style="margin:8px 0"></div>
+      <p class="mut" data-i="devD"></p>
+      <button id="pairBtn" data-i="pairBtn"></button>
+    </div>
+    <p class="mut" data-i="tip"></p>
     <audio id="ic" autoplay playsinline></audio>
   </section>
 
@@ -104,6 +119,8 @@ footer{padding:12px;text-align:center;font-size:12px;color:var(--mut)}
     <div id="joinCard" class="card" style="max-width:420px;margin:auto">
       <h3 data-i="joinT"></h3><p class="mut" data-i="joinD"></p>
       <div class="row"><input id="inp" class="mono" maxlength="11" autocomplete="off" autocapitalize="characters" style="flex:1"><button id="go" class="p" data-i="conn"></button></div>
+      <div class="row" style="margin-top:8px"><span class="mut" data-i="dnameL"></span><input id="dname" maxlength="24" style="flex:1"></div>
+      <button id="forget" class="hide" style="margin-top:8px" data-i="forget"></button>
     </div>
     <div id="streamBox" class="hide">
       <div id="frame" class="frame">
@@ -113,12 +130,12 @@ footer{padding:12px;text-align:center;font-size:12px;color:var(--mut)}
         <div id="lost" class="cover hide"><h2 data-i="lostT"></h2><p data-i="lostD"></p></div>
         <div id="alarm" class="cover hide"><h2 data-i="alT"></h2><p data-i="alD"></p><button id="dis" class="p" data-i="dis"></button></div>
         <div class="tr row">
-          <span id="iceB" class="badge">ICE: –</span><span id="rbat" class="badge">--</span><span id="bN" class="badge hide">☀️</span><span id="bD" class="badge hide">🌑</span><span id="bS" class="badge hide">🎵</span>
+          <span id="bNet" class="badge"></span><span id="bW" class="badge hide"></span><span id="iceB" class="badge">ICE: –</span><span id="rbat" class="badge">--</span><span id="bV" class="badge hide" data-i="bV"></span><span id="bM" class="badge hide" data-i="bM"></span><span id="bN" class="badge hide">☀️</span><span id="bD" class="badge hide">🌑</span><span id="bS" class="badge hide">🎵</span>
           <button id="fs" aria-label="Fullscreen">⛶</button>
         </div>
         <div class="bt">
           <div class="row spread mut"><span data-i="mic"></span><b id="plv" class="mono">0%</b></div>
-          <div class="bar"><i id="pbar"></i><b id="tm" style="left:35%"></b></div>
+          <div class="bar"><i id="pbar"></i><b id="tm" style="left:55%"></b></div>
         </div>
       </div>
       <div class="grid g2">
@@ -128,48 +145,57 @@ footer{padding:12px;text-align:center;font-size:12px;color:var(--mut)}
           <button id="mute" style="width:100%"></button>
         </div>
         <div class="card">
-          <div class="row spread"><b data-i="vox"></b><span id="tv" class="mono">35%</span></div>
-          <input type="range" id="thr" min="5" max="95" value="35" style="width:100%" aria-label="Threshold">
+          <div class="row spread"><b data-i="vox"></b><span id="tv" class="mono">55%</span></div>
+          <input type="range" id="thr" min="5" max="95" value="55" style="width:100%" aria-label="Threshold">
           <p class="mut" data-i="voxD"></p>
           <label class="row"><input type="checkbox" id="beep" checked><span data-i="beepL"></span></label>
+          <button id="tbeep" style="margin-top:8px" data-i="tBeep"></button>
         </div>
         <div class="card">
           <b data-i="remote"></b>
-          <div class="grid" style="margin:8px 0"><button id="rN" aria-label="Nightlight">☀️</button><button id="rD" aria-label="Dim screen">🌑</button><button id="rF" aria-label="Flip camera">🔄</button></div>
+          <div style="margin:8px 0">
+            <button id="rN" class="rb"><b data-i="rN_t"></b><span data-i="rN_d"></span></button>
+            <button id="rD" class="rb"><b data-i="rD_t"></b><span data-i="rD_d"></span></button>
+            <button id="rF" class="rb"><b data-i="rF_t"></b><span data-i="rF_d"></span></button>
+            <button id="rV" class="rb"><b data-i="rV_t"></b><span data-i="rV_d"></span></button>
+            <button id="rM" class="rb"><b data-i="rM_t"></b><span data-i="rM_d"></span></button>
+          </div>
+          <p class="mut" data-i="rS_d"></p>
           <select id="rsnd" style="width:100%;margin-bottom:8px"></select>
           <button id="ptt" style="width:100%" data-i="ptt"></button>
+          <p class="mut" data-i="rP_d"></p>
         </div>
       </div>
       <p class="card mut"><span data-i="last"></span> <b id="last" style="color:var(--fg)"></b></p>
     </div>
   </section>
 </main>
-<footer>BrowserBabyAlarm &bull; WebRTC</footer>
+<footer>BrowserBabyAlarm &bull; WebRTC &bull; <a href="#" id="reset" style="color:inherit" data-i="reset"></a></footer>
 
 <script>
 'use strict';
 /* ---------- i18n ---------- */
 const D={
 da:{sub:'P2P babyalarm i browseren',pick:'Vælg enhedstype',pickD:'Begge enheder åbner siden i en browser (HTTPS).',baby:'Baby-enhed',babyD:'Telefonen på babyens værelse. Streamer video og lyd.',parent:'Forældre-enhed',parentD:'Enheden du lytter på og modtager alarmer på.',
-priv:'Privatliv: Video og lyd sendes krypteret direkte mellem enhederne (WebRTC). Forbindelsen opsættes via PeerJS- og Google-servere, som kan se IP-adresser. Kun enheder med din private kode kan forbinde, og kun én forælder ad gangen.',
+priv:'Privatliv: Video og lyd sendes krypteret direkte mellem enhederne (WebRTC). Forbindelsen opsættes via PeerJS- og Google-servere, som kan se IP-adresser. Kun enheder, du selv har godkendt på babytelefonen, kan forbinde (maks. 2 ad gangen).',
 permT:'Tilladelse påkrævet',permD:'Browseren skal bruge kamera og mikrofon.',permB:'Giv adgang',scan:'Scan QR-koden på forældre-enheden, eller indtast koden:',codeL:'Kode:',copy:'Kopiér',newCode:'Ny kode',
 flip:'Vend kamera',night:'Natlys',dim:'Sort skærm',nightOff:'Sluk natlys',dimTip:'Tryk for at vække skærmen',cA:'Rav',cR:'Rød',cB:'Blå',snd:'Lyd:',bat:'Batteri:',bC:'Oplader ⚡',
-s_off:'Slukket',s_womb:'Livmoder (brun støj)',s_rain:'Regn',s_waves:'Havbølger',s_heart:'Hjerteslag',s_lull:'Vuggevise',
+s_off:'Slukket',s_womb:'Livmoder (brun støj)',s_rain:'Regn',s_waves:'Havbølger',s_fire:'Pejs',s_lull:'Vuggevise',
 joinT:'Forbind til baby-enhed',joinD:'Indtast koden fra babyens telefon:',conn:'Forbind',lostT:'FORBINDELSE MISTET!',lostD:'Telefonen har mistet netværket, eller siden blev lukket. Prøver automatisk igen…',
 alT:'LYD OVER GRÆNSEN!',alD:'Der er registreret vedvarende lyd på babyværelset.',dis:'Afvis',mic:'Lyd fra babyværelset:',boost:'Lydstyrke / boost',spkOn:'🔊 Højttaler tændt',spkOff:'🔇 Højttaler slukket',
 vox:'Gråde-tærskel',voxD:'Alarm ved vedvarende lyd over den røde streg.',beepL:'Bip ved alarm',remote:'Fjernstyring',ptt:'Hold for at tale',pttOn:'Taler…',last:'Seneste hændelse:',none:'Ingen endnu',unlock:'Tryk for at aktivere lyd',
 stIdle:'Vælg enhed',stWait:'Afventer kamera',stReq:'Anmoder om kamera…',stReady:'Klar til parring',stParent:'Forælder tilsluttet',stDenied:'Adgang afvist',stCalling:'Forbinder…',stLive:'Live',stLost:'Forbindelse mistet',stErr:'Fejl',
-denied:'Kunne ikke få adgang til kamera/mikrofon.',https:'Siden kører ikke over HTTPS – kamera og mikrofon virker ikke.',badCode:'Ugyldig kode.',nf:'Baby-enheden blev ikke fundet.',to:'Timeout – prøv igen.',lowBat:'Babytelefonens batteri er lavt!',vWait:'Venter på video…',vNo:'Ingen video endnu. Tryk for at prøve igen. Forbindelsestilstand:'},
+denied:'Kunne ikke få adgang til kamera/mikrofon.',https:'Siden kører ikke over HTTPS – kamera og mikrofon virker ikke.',badCode:'Ugyldig kode.',nf:'Baby-enheden blev ikke fundet.',to:'Timeout – prøv igen.',lowBat:'Babytelefonens batteri er lavt!',vWait:'Venter på video…',vNo:'Ingen video endnu. Tryk for at prøve igen. Forbindelsestilstand:',vOff:'Video er slukket på baby-enheden',bV:'Video fra',bM:'Mikrofon fra',rN_t:'Natlys',rN_d:'Tænder/slukker et blødt lys på babytelefonens skærm.',rD_t:'Sort skærm',rD_d:'Gør babytelefonens skærm sort. Kamera og lyd kører videre.',rF_t:'Vend kamera',rF_d:'Skifter mellem for- og bagkamera.',rV_t:'Video til/fra',rV_d:'Slukker kameraet for at spare batteri. Lyden kører videre.',rM_t:'Mikrofon til/fra',rM_d:'Slår mikrofonen fra for at spare batteri. Gråde-alarmen virker ikke, mens den er slukket.',rS_d:'Sovelyd: vælger den lyd, der afspilles på babytelefonen.',rP_d:'Hold knappen nede for at tale til babyen via babytelefonens højttaler.',devT:'Godkendte enheder',wnow:'Ser med nu:',rm:'Fjern',online:'online',devD:'Gemte enheder forbinder uden kode. Maks. 2 ad gangen.',pairBtn:'Par ny enhed',dnameL:'Enhedsnavn:',forget:'Glem gemt baby-enhed',watch:'Ser med',a_denied:'Enheden er ikke (længere) godkendt. Indtast koden igen.',a_closed:'Parring er lukket. Tryk på Par ny enhed på babytelefonen.',a_full:'Babytelefonen har allerede det maksimale antal gemte enheder. Fjern en først.',a_busy:'Der er allerede 2 forældre-enheder forbundet.',net:'Forbindelse',net_local:'Lokalt netværk',net_internet:'Internet (direkte)',net_relay:'Relæ (TURN)',tBeep:'Test alarmlyd',tip:'Tip: Hold telefonen i opladeren og siden åben. Brug Sort skærm i stedet for låseknappen.',reset:'Skift enhedstype'},
 en:{sub:'P2P browser baby monitor',pick:'Select device type',pickD:'Both devices open this page in a browser (HTTPS).',baby:'Baby device',babyD:"The phone in the baby's room. Streams video and audio.",parent:'Parent device',parentD:'The device you listen on and get alerts on.',
-priv:'Privacy: Video and audio go encrypted directly between devices (WebRTC). The connection is set up via PeerJS and Google servers, which can see IP addresses. Only devices with your private code can connect, one parent at a time.',
+priv:'Privacy: Video and audio go encrypted directly between devices (WebRTC). The connection is set up via PeerJS and Google servers, which can see IP addresses. Only devices you approved on the baby phone can connect (max 2 at a time).',
 permT:'Permission required',permD:'The browser needs camera and microphone access.',permB:'Grant access',scan:'Scan the QR code on the parent device, or enter the code:',codeL:'Code:',copy:'Copy',newCode:'New code',
 flip:'Flip camera',night:'Nightlight',dim:'Black screen',nightOff:'Turn off nightlight',dimTip:'Tap to wake the screen',cA:'Amber',cR:'Red',cB:'Blue',snd:'Sound:',bat:'Battery:',bC:'Charging ⚡',
-s_off:'Off',s_womb:'Womb (brown noise)',s_rain:'Rain',s_waves:'Ocean waves',s_heart:'Heartbeat',s_lull:'Lullaby',
+s_off:'Off',s_womb:'Womb (brown noise)',s_rain:'Rain',s_waves:'Ocean waves',s_fire:'Fireplace',s_lull:'Lullaby',
 joinT:'Connect to baby device',joinD:"Enter the code shown on the baby's phone:",conn:'Connect',lostT:'CONNECTION LOST!',lostD:'The phone lost its network or the page was closed. Retrying automatically…',
 alT:'NOISE OVER LIMIT!',alD:"Sustained noise detected in the baby's room.",dis:'Dismiss',mic:"Sound from baby's room:",boost:'Volume / boost',spkOn:'🔊 Speaker on',spkOff:'🔇 Speaker off',
 vox:'Cry threshold',voxD:'Alarm on sustained sound above the red line.',beepL:'Beep on alarm',remote:'Remote control',ptt:'Hold to talk',pttOn:'Talking…',last:'Last event:',none:'None yet',unlock:'Tap to enable audio',
 stIdle:'Choose device',stWait:'Waiting for camera',stReq:'Requesting camera…',stReady:'Ready to pair',stParent:'Parent connected',stDenied:'Access denied',stCalling:'Connecting…',stLive:'Live',stLost:'Connection lost',stErr:'Error',
-denied:'Could not access camera/microphone.',https:'Page is not served over HTTPS – camera and microphone will not work.',badCode:'Invalid code.',nf:'Baby device not found.',to:'Timeout – try again.',lowBat:"Baby phone's battery is low!",vWait:'Waiting for video…',vNo:'No video yet. Tap to retry. Connection state:'}
+denied:'Could not access camera/microphone.',https:'Page is not served over HTTPS – camera and microphone will not work.',badCode:'Invalid code.',nf:'Baby device not found.',to:'Timeout – try again.',lowBat:"Baby phone's battery is low!",vWait:'Waiting for video…',vNo:'No video yet. Tap to retry. Connection state:',vOff:'Video is turned off on the baby device',bV:'Video off',bM:'Mic off',rN_t:'Nightlight',rN_d:"Turns a soft light on/off on the baby phone's screen.",rD_t:'Black screen',rD_d:'Makes the baby phone screen black. Camera and audio keep running.',rF_t:'Flip camera',rF_d:'Switches between front and back camera.',rV_t:'Video on/off',rV_d:'Turns the camera off to save battery. Audio keeps running.',rM_t:'Microphone on/off',rM_d:'Mutes the microphone to save battery. The cry alarm does not work while it is off.',rS_d:'Sleep sound: chooses the sound played on the baby phone.',rP_d:"Hold the button to talk to the baby through the baby phone's speaker.",devT:'Allowed devices',wnow:'Watching now:',rm:'Remove',online:'online',devD:'Saved devices connect without the code. Max 2 at a time.',pairBtn:'Pair new device',dnameL:'Device name:',forget:'Forget saved baby device',watch:'Watching',a_denied:'This device is not (or no longer) approved. Enter the code again.',a_closed:'Pairing is closed. Tap Pair new device on the baby phone.',a_full:'The baby phone already has the maximum number of saved devices. Remove one first.',a_busy:'Two parent devices are already connected.',net:'Link',net_local:'Local network',net_internet:'Internet (direct)',net_relay:'Relay (TURN)',tBeep:'Test alarm sound',tip:'Tip: Keep the phone plugged in with this page open. Use Black screen instead of the lock button.',reset:'Change device type'}
 };
 const $=id=>document.getElementById(id);
 let lang=localStorage.getItem('bba-lang')||(navigator.language.startsWith('da')?'da':'en');
@@ -184,11 +210,12 @@ $('lang').onchange=e=>{lang=e.target.value;localStorage.setItem('bba-lang',lang)
 /* ---------- helpers ---------- */
 const ICE=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}
   /* Add a TURN server for CGNAT / mobile data / client-isolated Wi-Fi, e.g. {urls:'turn:turn.example.com:3478',username:'u',credential:'p'} */];
-const SOUNDS=['off','womb','rain','waves','heart','lull'];
+const SOUNDS=['off','womb','rain','waves','fire','lull'];
 const ALPH='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const rnd=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(x=>ALPH[x%ALPH.length]).join('');
 const norm=s=>s.toUpperCase().replace(/[^A-Z0-9]/g,'');
 const pid=c=>'bba-'+norm(c);
+const lvl=r=>r<3e-4?0:Math.max(0,Math.min(100,Math.round((20*Math.log10(r)+70)*2)));   // dBFS -70..-20 -> 0..100
 const send=(c,m)=>{try{if(c&&c.open)c.send(m)}catch(e){}};
 let role=null,peer=null,actx=null,lastSet=false,noteT;
 const ensureAudio=()=>{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume().catch(()=>{});return actx};
@@ -216,9 +243,16 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&role==='b
 [['c','bC'],['100'],['80'],['60'],['40'],['20'],['10']].forEach(([v,k])=>{const o=new Option(k?'':'~'+v+'%',v);if(k)o.dataset.i=k;$('batSel').add(o)});
 
 /* ---------- BABY ---------- */
-let stream=null,audioTrack=null,videoTrack=null,facing='environment',parentId=null,lastSeen=0,bconn=null,bcall=null;
-let night=false,dim=false,sound='off',bat={l:100,c:false,e:true},level=0;
-$('bBtn').onclick=()=>{show('baby');setStatus(t('stWait'),'warn');initBattery();if(!window.isSecureContext)note(t('https'),'bad')};
+let stream=null,audioTrack=null,videoTrack=null,facing='environment';
+const MAXV=2,MAXD=4;   // max simultaneous parents / max remembered devices
+let devs=[];try{devs=JSON.parse(localStorage.getItem('bba-devs')||'[]')}catch(e){}
+let pairUntil=0;const viewers=new Map();   // token -> {conn,call,seen,n}
+const saveDevs=()=>localStorage.setItem('bba-devs',JSON.stringify(devs));
+const bcast=m=>viewers.forEach(v=>send(v.conn,m));
+const calls=()=>[...viewers.values()].map(v=>v.call).filter(Boolean);
+const vnames=()=>[...viewers.values()].map(v=>v.n);
+let night=false,dim=false,sound='off',bat={l:100,c:false,e:true},level=0,vidOn=true,micOn=true;
+$('bBtn').onclick=()=>{localStorage.removeItem('bba-role');show('baby');setStatus(t('stWait'),'warn');initBattery();if(!window.isSecureContext)note(t('https'),'bad')};
 $('grant').onclick=grant;
 async function setVideo(){
   if(videoTrack)videoTrack.stop();   // release first: many phones can't open two cameras
@@ -226,8 +260,10 @@ async function setVideo(){
   videoTrack=v.getVideoTracks()[0];
   stream=new MediaStream([audioTrack,videoTrack]);
   $('prev').srcObject=stream;
-  const s=bcall&&bcall.peerConnection&&bcall.peerConnection.getSenders().find(x=>x.track&&x.track.kind==='video');
-  if(s)await s.replaceTrack(videoTrack);
+  for(const c of calls()){
+    const s=c.peerConnection&&c.peerConnection.getSenders().find(x=>!x.track||x.track.kind==='video');
+    if(s)await s.replaceTrack(videoTrack);
+  }
 }
 async function grant(){
   try{
@@ -237,7 +273,7 @@ async function grant(){
       audioTrack=a.getAudioTracks()[0];startMeter(a);
     }
     await setVideo();
-    $('permCard').classList.add('hide');$('pairCard').classList.remove('hide');
+    $('permCard').classList.add('hide');
     wake();if(!peer)initBabyPeer();
   }catch(e){note(t('denied'),'bad');setStatus(t('stDenied'),'bad')}
 }
@@ -247,41 +283,80 @@ function startMeter(a){   // single meter loop; setInterval keeps running when t
   const d=new Uint8Array(512);
   setInterval(()=>{
     an.getByteTimeDomainData(d);let s=0;for(const x of d){const n=(x-128)/128;s+=n*n}
-    level=Math.min(100,Math.round(Math.sqrt(s/d.length)*320));
-    $('mbar').style.width=level+'%';send(bconn,{type:'lvl',v:level});
+    level=lvl(Math.sqrt(s/d.length));
+    $('mbar').style.width=level+'%';bcast({type:'lvl',v:level});
   },100);
 }
-function claim(p){   // only one parent at a time; a new one may take over once the old one has been silent for 8 s
-  if(!parentId||parentId===p||Date.now()-lastSeen>8000){parentId=p;lastSeen=Date.now();return true}
-  return false;
+let babyReady=false;
+function pairUI(){const o=babyReady&&Date.now()<pairUntil;$('pairCard').classList.toggle('hide',!o);$('pairBtn').classList.toggle('hide',o)}
+function openPair(){pairUntil=Date.now()+300000;pairUI()}   // pairing window: 5 min, closes as soon as one device has paired
+function auth(m){   // known token = always allowed; no token = only while the pairing window is open
+  const nm=String(m.n||'Parent').slice(0,24);let d=null,nw=false;
+  if(m.tok){d=devs.find(x=>x.t===m.tok);if(!d)return{why:'denied'}}
+  else if(Date.now()<pairUntil){if(devs.length>=MAXD)return{why:'full'};nw=true}
+  else return{why:'closed'};
+  if(viewers.size>=MAXV&&!(d&&viewers.has(d.t)))return{why:'busy'};
+  if(nw){d={t:rnd(16),n:nm,a:Date.now()};devs.push(d);pairUntil=0}
+  d.n=nm;saveDevs();pairUI();
+  return{ok:true,tok:d.t,nw,n:nm};
 }
+function dropViewer(k){const v=viewers.get(k);if(!v)return;viewers.delete(k);try{v.conn.close()}catch(e){}try{v.call&&v.call.close()}catch(e){}}
+function renderDevs(){
+  $('wnow').textContent=t('wnow')+' '+viewers.size+(viewers.size?' ('+vnames().join(', ')+')':'');
+  const l=$('devl');l.innerHTML='';
+  devs.forEach(d=>{
+    const r=document.createElement('div');r.className='row spread';r.style.marginBottom='6px';
+    const sp=document.createElement('span');sp.textContent=d.n+(viewers.has(d.t)?' – '+t('online'):'');
+    const b=document.createElement('button');b.textContent=t('rm');
+    b.onclick=()=>{devs=devs.filter(x=>x!==d);saveDevs();dropViewer(d.t);renderDevs();syncState()};
+    r.append(sp,b);l.append(r);
+  });
+}
+setInterval(()=>{   // drop silent viewers, expire the pairing window
+  let ch=false;
+  viewers.forEach((v,k)=>{if(Date.now()-v.seen>15000){dropViewer(k);ch=true}});
+  if(pairUntil&&Date.now()>pairUntil){pairUntil=0;pairUI()}
+  if(ch){renderDevs();syncState()}
+},2000);
+$('pairBtn').onclick=openPair;
 function initBabyPeer(){
   let code=localStorage.getItem('bba-code');
   if(!code){code=rnd(10);localStorage.setItem('bba-code',code)}
   peer=new Peer(pid(code),{config:{iceServers:ICE}});
   peer.on('open',()=>{
-    $('code').textContent=code.slice(0,5)+'-'+code.slice(5);setStatus(t('stReady'),'ok');
+    babyReady=true;$('code').textContent=code.slice(0,5)+'-'+code.slice(5);setStatus(t('stReady'),'ok');
     $('qr').innerHTML='';new QRCode($('qr'),{text:location.origin+location.pathname+'#join='+code,width:150,height:150});
-  });
-  peer.on('call',c=>{
-    if(c.metadata&&c.metadata.type==='intercom'){
-      if(c.peer!==parentId)return c.close();
-      c.answer();c.on('stream',s=>{$('ic').srcObject=s;$('ic').play().catch(()=>{})});return;
-    }
-    if(!claim(c.peer))return c.close();
-    if(bcall&&bcall!==c)try{bcall.close()}catch(e){}
-    bcall=c;c.answer(stream);setStatus(t('stParent'),'ok');note(t('stParent'),'ok');
-    c.on('close',()=>{if(bcall===c)bcall=null});
+    if(!devs.length&&!pairUntil)openPair();else pairUI();
+    renderDevs();
   });
   peer.on('connection',c=>{
-    if(!claim(c.peer))return c.close();
-    if(bconn&&bconn!==c)try{bconn.close()}catch(e){}
-    bconn=c;c.on('open',syncState);
+    let tok=null;
     c.on('data',m=>{
-      if(c!==bconn||!m)return;lastSeen=Date.now();
+      if(!m)return;
+      if(!tok){   // first message must be a hello; nothing else is accepted from unknown peers
+        if(m.type!=='hello'){c.close();return}
+        const r=auth(m);
+        if(!r.ok){send(c,{type:'auth',ok:false,why:r.why});setTimeout(()=>{try{c.close()}catch(e){}},400);return}
+        tok=r.tok;
+        const old=viewers.get(tok);
+        viewers.set(tok,{conn:c,call:null,seen:Date.now(),n:r.n});
+        if(old){try{old.conn.close()}catch(e){}try{old.call&&old.call.close()}catch(e){}}
+        send(c,{type:'auth',ok:true,tok:r.nw?r.tok:undefined});
+        renderDevs();syncState();return;
+      }
+      const v=viewers.get(tok);if(!v||v.conn!==c)return;
+      v.seen=Date.now();
       if(m.type==='ping')send(c,{type:'pong'});else command(m);
     });
-    c.on('close',()=>{if(bconn===c)bconn=null});
+    c.on('close',()=>{const v=tok&&viewers.get(tok);if(v&&v.conn===c){viewers.delete(tok);renderDevs();syncState()}});
+  });
+  peer.on('call',c=>{   // calls are only accepted from peers that authenticated on the data channel first
+    const v=[...viewers.values()].find(x=>x.conn.peer===c.peer);
+    if(!v)return c.close();
+    if(c.metadata&&c.metadata.type==='intercom'){c.answer();c.on('stream',s=>{$('ic').srcObject=s;$('ic').play().catch(()=>{})});return}
+    if(v.call&&v.call!==c)try{v.call.close()}catch(e){}
+    v.call=c;c.answer(stream);setStatus(t('stParent'),'ok');
+    c.on('close',()=>{if(v.call===c)v.call=null});
   });
   peer.on('error',e=>{
     if(e.type==='unavailable-id')setTimeout(()=>{peer.destroy();peer=null;initBabyPeer()},3000);   // old session still registered
@@ -290,20 +365,36 @@ function initBabyPeer(){
   peer.on('disconnected',()=>{if(!peer.destroyed)setTimeout(()=>peer.reconnect(),2000)});
 }
 $('nc2').onclick=()=>{
-  localStorage.removeItem('bba-code');parentId=null;
-  [bcall,bconn].forEach(x=>{try{x&&x.close()}catch(e){}});
-  if(peer)peer.destroy();peer=null;initBabyPeer();
+  localStorage.removeItem('bba-code');devs=[];saveDevs();pairUntil=0;
+  [...viewers.keys()].forEach(dropViewer);
+  babyReady=false;if(peer)peer.destroy();peer=null;initBabyPeer();
 };
 $('cp').onclick=()=>navigator.clipboard&&navigator.clipboard.writeText($('code').textContent).catch(()=>{});
-function syncState(){send(bconn,{type:'st',night,dim,sound,bat:{l:Math.round(bat.l),c:bat.c,e:bat.e}})}
+function syncState(){bcast({type:'st',viewers:vnames(),night,dim,sound,vid:vidOn,mic:micOn,bat:{l:Math.round(bat.l),c:bat.c,e:bat.e}})}
 function command(m){   // whitelist only
   if(m.a==='night')setNight(!night);else if(m.a==='dim')setDim(!dim);else if(m.a==='flip')flip();
   else if(m.a==='sound'&&SOUNDS.includes(m.v))setSound(m.v);
+  else if(m.a==='vid')setVid(!vidOn);else if(m.a==='mic')setMic(!micOn);
 }
+async function setVid(on){   // off = release the camera hardware (the real battery saving)
+  vidOn=on;
+  try{
+    if(!on){
+      if(videoTrack)videoTrack.stop();
+      for(const c of calls()){
+        const s=c.peerConnection&&c.peerConnection.getSenders().find(x=>!x.track||x.track.kind==='video');
+        if(s)await s.replaceTrack(null);
+      }
+      $('prev').srcObject=null;
+    }else await setVideo();
+  }catch(e){vidOn=!on;note(t('denied'),'bad')}
+  syncState();
+}
+function setMic(on){micOn=on;if(audioTrack)audioTrack.enabled=on;syncState()}
 function ov(){$('nightOv').classList.toggle('hide',!night);$('dimOv').classList.toggle('hide',!dim);syncState()}
 function setNight(on){night=on;if(on)dim=false;ov()}
 function setDim(on){dim=on;if(on)night=false;ov()}
-async function flip(){facing=facing==='user'?'environment':'user';try{await setVideo()}catch(e){note(t('denied'),'bad')}}
+async function flip(){if(!vidOn)return;facing=facing==='user'?'environment':'user';try{await setVideo()}catch(e){note(t('denied'),'bad')}}
 $('bFlip').onclick=flip;$('bNight').onclick=()=>setNight(!night);$('bDim').onclick=()=>setDim(!dim);
 $('nOff').onclick=()=>setNight(false);$('dimOv').onclick=()=>setDim(false);
 document.querySelectorAll('.nc').forEach(b=>b.onclick=()=>{$('nightOv').style.background=b.dataset.c;$('nightOv').style.color=b.dataset.f});
@@ -339,6 +430,14 @@ function blip(c,f,f2,v,o,d){
   g.gain.setValueAtTime(.001,t0);g.gain.linearRampToValueAtTime(v,t0+.03);g.gain.exponentialRampToValueAtTime(.001,t0+d);
   os.connect(g);g.connect(c.destination);os.start(t0);os.stop(t0+d+.05);
 }
+function crackle(c){   // short filtered noise burst with fast decay = one pop of the fire
+  const n=Math.floor(c.sampleRate*(.01+Math.random()*.05)),b=c.createBuffer(1,n,c.sampleRate),o=b.getChannelData(0);
+  for(let i=0;i<n;i++)o[i]=(Math.random()*2-1)*Math.pow(1-i/n,3);
+  const s=c.createBufferSource();s.buffer=b;
+  const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=800+Math.random()*3500;f.Q.value=.8;
+  const g=c.createGain();g.gain.value=.1+Math.random()*.35;
+  s.connect(f);f.connect(g);g.connect(c.destination);s.start();
+}
 function setSound(m){
   stimers.forEach(clearInterval);stimers=[];snodes.forEach(n=>{try{n.stop()}catch(e){}});snodes=[];
   sound=m;$('snd').value=m;
@@ -347,26 +446,29 @@ function setSound(m){
     if(m==='womb')loop(c,.02,420,.5);
     else if(m==='rain')loop(c,.3,2500,.2);
     else if(m==='waves'){const g=loop(c,.04,600,.2),l=c.createOscillator(),lg=c.createGain();l.frequency.value=.1;lg.gain.value=.15;l.connect(lg);lg.connect(g.gain);l.start();snodes.push(l)}
-    else if(m==='heart')every(()=>{blip(c,65,30,.35,0,.22);blip(c,52,30,.22,.28,.22)},1000);
+    else if(m==='fire'){loop(c,.02,320,.4);every(()=>{if(Math.random()<.4)crackle(c)},80)}
     else{const n=[261.63,329.63,392,329.63,440,392,329.63,293.66,349.23,293.66,261.63,261.63];let i=0;every(()=>{const f=n[i++%n.length];blip(c,f,f,.08,0,1.4)},900)}
   }
   syncState();
 }
 
 /* ---------- PARENT ---------- */
-let ice='new',callAt=0,videoOk=false;
+let ice='new',callAt=0,videoOk=false,vidOffR=false;
 let target=null,pcall=null,pconn=null,rStream=null,lastHb=0,lost=false,hb=null,lastTry=0,connecting=false,lostT=null;
 let pump=null,src=null,an=null,gn=null,comp=null,loopOn=false,dummyS=null;
-let gain=150,muted=false,thr=35,rLevel=0,lvAt=0,alarmOn=false,alarmT=null,alarmN=0,lowShown=false,pttS=null,pttC=null;
+let gain=150,muted=false,thr=55,rLevel=0,lvAt=0,alarmOn=false,alarmT=null,alarmN=0,lowShown=false,pttS=null,pttC=null;
 const td=new Uint8Array(512),hist=[];
 const hashM=location.hash.match(/join=([A-Za-z0-9]+)/),joinCode=hashM?norm(hashM[1]):'';
 if(hashM)history.replaceState(null,'',location.pathname);   // keep the secret out of history
 
 $('pBtn').onclick=startParent;
 function startParent(){
-  show('parent');setStatus(t('stIdle'),'mut');
+  localStorage.setItem('bba-role','parent');show('parent');setStatus(t('stIdle'),'mut');
   peer=new Peer({config:{iceServers:ICE}});
-  peer.on('open',()=>{if(joinCode&&!target){$('inp').value=joinCode.slice(0,5)+'-'+joinCode.slice(5);connect()}});
+  peer.on('open',()=>{
+    if(joinCode&&!target){$('inp').value=joinCode.slice(0,5)+'-'+joinCode.slice(5);connect()}
+    else if(!target&&saved())connect();   // remembered baby device: reconnect without typing
+  });
   peer.on('error',e=>{
     busy(false);
     if(e.type==='peer-unavailable'){if(!lost)note(t('nf'),'bad')}else note('Peer: '+e.type,'bad');
@@ -385,50 +487,90 @@ function dummy(){   // PeerJS needs a local stream so the offer contains audio+v
 }
 $('go').onclick=connect;
 $('inp').onkeydown=e=>{if(e.key==='Enter')connect()};
+const DEV='bba-saved';
+function saved(){try{return JSON.parse(localStorage.getItem(DEV)||'null')}catch(e){return null}}
+let ptok=null;
+function dname(){
+  const v=($('dname').value||'').trim()||(/iPhone|iPad/.test(navigator.userAgent)?'iPhone':/Android/.test(navigator.userAgent)?'Android':'Computer');
+  localStorage.setItem('bba-name',v);return v;
+}
 async function connect(){
-  const code=norm($('inp').value);
+  const sv=saved();let code=norm($('inp').value);
+  if(!code&&sv)code=sv.code;
   if(code.length!==10||!peer||!peer.open)return note(t('badCode'),'bad');
+  ptok=(sv&&sv.code===code)?sv.tok:null;   // saved device: connect with its token, no pairing needed
   target=pid(code);busy(true);setStatus(t('stCalling'),'warn');ensureAudio();
   if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});
   // Granting mic permission lets the browser expose real LAN addresses instead of mDNS names (helps phone-to-phone on Wi-Fi)
   try{const m=await navigator.mediaDevices.getUserMedia({audio:true});m.getTracks().forEach(x=>x.stop())}catch(e){}
-  dial();
+  dial(false);
   setTimeout(()=>{if(connecting){busy(false);note(t('to'),'bad');setStatus(t('stErr'),'bad')}},12000);
 }
-function dial(keep){   // keep=true: only redo the media call, leave a healthy data connection alone
-  const old=pcall,oc=keep?null:pconn;pcall=null;if(!keep)pconn=null;
-  try{old&&old.close()}catch(e){}try{oc&&oc.close()}catch(e){}
-  const c=peer.call(target,dummy());pcall=c;callAt=Date.now();videoOk=false;ice='new';watchIce(c);
-  if(!keep){
-    const dc=peer.connect(target,{reliable:true});pconn=dc;
-    dc.on('open',()=>{lastHb=Date.now()});
-    dc.on('data',onData);
+function dial(keep){   // keep=true: data connection is healthy, only redo the media call
+  if(keep){startCall();return}
+  const oc=pconn;pconn=null;try{oc&&oc.close()}catch(e){}
+  const dc=peer.connect(target,{reliable:true});pconn=dc;
+  dc.on('open',()=>{lastHb=Date.now();send(dc,{type:'hello',tok:ptok,n:dname()})});
+  dc.on('data',m=>{if(pconn===dc)onData(m)});
+}
+function onAuth(m){
+  if(!m.ok){
+    busy(false);note(t('a_'+m.why)||t('stErr'),'bad');setStatus(t('stErr'),'bad');
+    if(m.why==='denied'){   // revoked on the baby phone: forget and go back to the code screen
+      localStorage.removeItem(DEV);ptok=null;clearInterval(hb);setLost(false);
+      $('streamBox').classList.add('hide');$('joinCard').classList.remove('hide');$('forget').classList.add('hide');
+    }
+    return;
   }
+  if(m.tok){ptok=m.tok;localStorage.setItem(DEV,JSON.stringify({code:target.slice(4),tok:m.tok}));$('forget').classList.remove('hide')}
+  startCall();
+}
+function startCall(){
+  const old=pcall;pcall=null;try{old&&old.close()}catch(e){}
+  const c=peer.call(target,dummy());pcall=c;callAt=Date.now();videoOk=false;ice='new';watchIce(c);
   c.on('stream',s=>{
     if(pcall!==c)return;
     busy(false);rStream=s;lastHb=Date.now();setLost(false);setStatus(t('stLive'),'ok');
     $('joinCard').classList.add('hide');$('streamBox').classList.remove('hide');
     const v=$('rv');v.srcObject=s;v.muted=true;v.play().catch(()=>{});
-    ['playing','resize','loadedmetadata'].forEach(ev=>v.addEventListener(ev,chk));
+    v.onplaying=v.onresize=v.onloadedmetadata=chk;
     if(!videoOk){$('vwait').classList.remove('hide');$('vmsg').textContent=t('vWait')}
     watchIce(c);wire(s);startHb();
   });
   c.on('close',()=>{if(pcall===c&&!lost)setLost(true)});
 }
+let nt=null;
+async function netType(){   // which route the video really takes: same network / internet / relay
+  const b=$('bNet'),q=pcall&&pcall.peerConnection;
+  if(!q||(ice!=='connected'&&ice!=='completed')){b.textContent=t('net')+': –';b.className='badge';return}
+  try{
+    const st=await q.getStats();let sel=null;const pairs=[],c={};
+    st.forEach(r=>{
+      if(r.type==='transport'&&r.selectedCandidatePairId)sel=r.selectedCandidatePairId;
+      else if(r.type==='candidate-pair')pairs.push(r);
+      else if(r.type==='local-candidate'||r.type==='remote-candidate')c[r.id]=r;
+    });
+    const pr=pairs.find(x=>x.id===sel)||pairs.find(x=>x.nominated&&x.state==='succeeded')||pairs.find(x=>x.state==='succeeded');
+    if(!pr)return;
+    const a=(c[pr.localCandidateId]||{}).candidateType,z=(c[pr.remoteCandidateId]||{}).candidateType;
+    const k=(a==='relay'||z==='relay')?'relay':(a==='host'&&z==='host')?'local':'internet';
+    b.textContent=t('net')+': '+t('net_'+k);b.className='badge '+(k==='local'?'ok':'warn');
+  }catch(e){}
+}
 function watchIce(c){
   const q=c.peerConnection;if(!q||c._w)return;c._w=1;ice=q.iceConnectionState;
-  const u=()=>{if(pcall===c){ice=q.iceConnectionState;$('iceB').textContent='ICE: '+ice}};u();q.addEventListener('iceconnectionstatechange',u);
+  const u=()=>{if(pcall===c){ice=q.iceConnectionState;$('iceB').textContent='ICE: '+ice;$('iceB').classList.toggle('hide',ice==='connected'||ice==='completed');netType()}};u();q.addEventListener('iceconnectionstatechange',u);
 }
-function chk(){const v=$('rv');if(v.videoWidth>0&&!v.paused){videoOk=true;$('vwait').classList.add('hide')}}
+function chk(){const v=$('rv');if(v.videoWidth>0&&!v.paused){videoOk=true;if(!vidOffR)$('vwait').classList.add('hide')}}
 $('vwait').onclick=()=>{ensureAudio();$('rv').play().catch(()=>{});if(pump)pump.play().catch(()=>{});chk()};
 function startHb(){
-  clearInterval(hb);
+  clearInterval(hb);clearInterval(nt);nt=setInterval(netType,4000);
   hb=setInterval(()=>{
     send(pconn,{type:'ping'});chk();
     if(Date.now()-lastHb>6000){if(!lost)setLost(true);retry()}
     // PeerJS uses a separate RTCPeerConnection for media, so data can work while video does not
     if(ice==='failed'){if(!lost)setLost(true);retry(true)}
-    if(!videoOk){
+    if(!videoOk&&!vidOffR){
       $('vwait').classList.remove('hide');
       if(Date.now()-callAt>8000)$('vmsg').textContent=t('vNo')+' '+ice;
       if(Date.now()-callAt>15000)retry(true);
@@ -449,11 +591,16 @@ function setLost(l){
   else setStatus(t('stLive'),'ok');
 }
 function onData(m){
-  if(!m)return;lastHb=Date.now();if(lost)setLost(false);
+  if(!m)return;if(m.type==='auth'){onAuth(m);return}
+  lastHb=Date.now();if(lost)setLost(false);
   if(m.type==='lvl'){rLevel=m.v||0;lvAt=Date.now()}
   else if(m.type==='st'){
     $('bN').classList.toggle('hide',!m.night);$('bD').classList.toggle('hide',!m.dim);$('bS').classList.toggle('hide',m.sound==='off');
     if(m.sound)$('rsnd').value=m.sound;battery(m.bat);
+    if(m.viewers){$('bW').classList.remove('hide');$('bW').textContent=t('watch')+': '+m.viewers.length}
+    vidOffR=m.vid===false;$('bV').classList.toggle('hide',!vidOffR);$('bM').classList.toggle('hide',m.mic!==false);
+    $('rN').classList.toggle('on',!!m.night);$('rD').classList.toggle('on',!!m.dim);$('rV').classList.toggle('on',vidOffR);$('rM').classList.toggle('on',m.mic===false);
+    if(vidOffR){$('vwait').classList.remove('hide');$('vmsg').textContent=t('vOff')}else chk();
   }
 }
 function battery(b){
@@ -482,25 +629,25 @@ function applyAudio(){
 }
 function updateMute(){$('mute').textContent=muted?t('spkOff'):t('spkOn')}
 $('unlock').onclick=()=>{ensureAudio();if(pump)pump.play().catch(()=>{});$('unlock').classList.add('hide')};
-$('gain').oninput=e=>{gain=+e.target.value;$('gv').textContent=gain+'%';applyAudio()};
+$('gain').oninput=e=>{gain=+e.target.value;localStorage.setItem('bba-gain',gain);$('gv').textContent=gain+'%';applyAudio()};
 $('mute').onclick=()=>{muted=!muted;applyAudio();updateMute()};
-$('thr').oninput=e=>{thr=+e.target.value;$('tv').textContent=thr+'%';$('tm').style.left=thr+'%'};
+$('thr').oninput=e=>{thr=+e.target.value;localStorage.setItem('bba-thr',thr);$('tv').textContent=thr+'%';$('tm').style.left=thr+'%'};
 
-/* detection: alarm only on sustained sound (>=8 of the last 20 samples = 0.8 s of 2 s) */
+/* detection: alarm only on sustained sound (>=6 of the last 20 samples = 0.6 s of 2 s) */
 function tick(){
   an.getByteTimeDomainData(td);let s=0;for(const x of td){const n=(x-128)/128;s+=n*n}
   const r=Date.now()-lvAt<600?rLevel:0;
-  const lv=Math.max(Math.min(100,Math.round(Math.sqrt(s/td.length)*320)),r);
+  const lv=Math.max(lvl(Math.sqrt(s/td.length)),r);
   $('pbar').style.width=lv+'%';$('plv').textContent=lv+'%';
   $('pbar').style.background=lv>=thr?'var(--bad)':lv>thr*.7?'var(--warn)':'var(--ok)';
   hist.push(lv>=thr);if(hist.length>20)hist.shift();
-  if(!alarmOn&&hist.filter(Boolean).length>=8)raise(lv);
+  if(!alarmOn&&hist.filter(Boolean).length>=6)raise(lv);
 }
 function raise(lv){
   alarmOn=true;alarmN=0;hist.length=0;lastSet=true;
   $('last').textContent=lv+'% @ '+new Date().toLocaleTimeString();
   $('alarm').classList.remove('hide');$('frame').classList.add('alert');document.title='🔔 BrowserBabyAlarm';
-  const f=()=>{if($('beep').checked)beep(587,880,Math.min(.6,.12+alarmN*.05));alarmN++;if(navigator.vibrate)navigator.vibrate([300,150,300])};
+  const f=()=>{if($('beep').checked)beep(587,880,Math.min(1,.4+alarmN*.1));alarmN++;if(navigator.vibrate)navigator.vibrate([300,150,300])};
   f();alarmT=setInterval(f,2000);notify(t('alT'));   // repeats and gets louder until dismissed
 }
 $('dis').onclick=()=>{
@@ -509,7 +656,7 @@ $('dis').onclick=()=>{
 };
 
 /* remote control + push-to-talk (persistent intercom call, mic gated with track.enabled) */
-$('rN').onclick=()=>send(pconn,{a:'night'});$('rD').onclick=()=>send(pconn,{a:'dim'});$('rF').onclick=()=>send(pconn,{a:'flip'});
+$('rN').onclick=()=>send(pconn,{a:'night'});$('rD').onclick=()=>send(pconn,{a:'dim'});$('rF').onclick=()=>send(pconn,{a:'flip'});$('rV').onclick=()=>send(pconn,{a:'vid'});$('rM').onclick=()=>send(pconn,{a:'mic'});
 $('rsnd').onchange=e=>send(pconn,{a:'sound',v:e.target.value});
 $('fs').onclick=()=>{document.fullscreenElement?document.exitFullscreen().catch(()=>{}):$('frame').requestFullscreen().catch(()=>{})};
 async function pttStart(e){
@@ -530,7 +677,16 @@ pb.addEventListener('pointerdown',pttStart);
 
 /* ---------- init ---------- */
 applyLang();setStatus(t('stIdle'),'mut');
-if(joinCode)startParent();
+$('dname').value=localStorage.getItem('bba-name')||'';
+{const g=localStorage.getItem('bba-gain'),h=localStorage.getItem('bba-thr');   // remember volume and threshold
+ if(g){gain=+g;$('gain').value=g;$('gv').textContent=g+'%'}
+ if(h){thr=+h;$('thr').value=h;$('tv').textContent=h+'%';$('tm').style.left=h+'%'}}
+$('tbeep').onclick=()=>{beep(587,880,.8);if(navigator.vibrate)navigator.vibrate([300,150,300])};
+$('reset').onclick=e=>{e.preventDefault();localStorage.removeItem('bba-role');location.replace(location.pathname)};
+if(saved())$('forget').classList.remove('hide');
+$('forget').onclick=()=>{localStorage.removeItem(DEV);ptok=null;$('forget').classList.add('hide')};
+if(joinCode||(localStorage.getItem('bba-role')==='parent'&&saved()))startParent();   // remembered parent device starts by itself
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
 </html>
