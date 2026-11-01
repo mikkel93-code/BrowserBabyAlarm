@@ -5,6 +5,7 @@ A baby monitor that runs entirely in the browser. Put one phone in the baby's ro
 - Live **video and audio**, sent directly between your devices with WebRTC (via [PeerJS](https://peerjs.com))
 - **Cry alarm** that triggers on sustained sound, gets louder until dismissed, and vibrates / notifies
 - Up to **2 parents at once**, with a "Watching: N" badge, and **saved devices** so you only pair once
+- **Quality / bandwidth slider** (5 steps, from about 0.15 to 2.5 Mbit/s of video) and a live receive-rate badge, so the monitor stays out of the way of games or video calls
 - **Remote control** of the baby phone: nightlight, black screen, flip camera, camera on/off and mic on/off (battery saving), sleep sounds, push-to-talk
 - **Sleep sounds** generated in the browser: womb noise, rain, ocean waves, fireplace, lullaby
 - **Connection badge** showing whether the video travels over your local network, the internet, or a relay
@@ -15,7 +16,10 @@ A baby monitor that runs entirely in the browser. Put one phone in the baby's ro
 ## Quick start (GitHub Pages)
 
 Camera and microphone access require **HTTPS** (or `localhost`). The easiest way to get HTTPS is GitHub Pages:
-Open `https://mikkel93-code.github.io/BrowserBabyAlarm/` on both devices.
+
+1. Fork or upload this repository to your GitHub account.
+2. **Settings → Pages →** deploy from the `main` branch, root folder.
+3. Open `https://<your-user>.github.io/<repo>/` on both devices.
 
 **Baby phone:** tap *Baby device* → *Grant access*. A QR code and a code appear.
 **Parent device:** tap *Parent device*, scan the QR code or type the code, and optionally give the device a name.
@@ -30,6 +34,7 @@ From then on, the parent device reconnects by itself when you open the app.
 | Remove a device | Baby phone → *Allowed devices* → **Remove** |
 | Revoke everyone | Baby phone → **New code** (also changes the code) |
 | Cry threshold | Parent screen slider; the red line on the live level bar is the threshold. Alarm = sustained sound above it (about 0.6 s within 2 s) |
+| Limit bandwidth | Parent: *Video quality / bandwidth* slider. The baby phone caps video bitrate, resolution and frame rate (default: Medium, about 0.6 Mbit/s) and audio bitrate (16-64 kbit/s). The *↓ kbit/s* badge shows the real receive rate |
 | Save battery | Parent: *Video on/off* turns the baby phone's camera off. *Microphone on/off* only mutes (and disables the cry alarm) |
 | Keep the baby phone awake | Keep it plugged in with the page open. Use **Black screen** rather than the lock button |
 

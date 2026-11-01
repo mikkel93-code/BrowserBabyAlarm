@@ -130,7 +130,7 @@ footer{padding:12px;text-align:center;font-size:12px;color:var(--mut)}
         <div id="lost" class="cover hide"><h2 data-i="lostT"></h2><p data-i="lostD"></p></div>
         <div id="alarm" class="cover hide"><h2 data-i="alT"></h2><p data-i="alD"></p><button id="dis" class="p" data-i="dis"></button></div>
         <div class="tr row">
-          <span id="bNet" class="badge"></span><span id="bW" class="badge hide"></span><span id="iceB" class="badge">ICE: –</span><span id="rbat" class="badge">--</span><span id="bV" class="badge hide" data-i="bV"></span><span id="bM" class="badge hide" data-i="bM"></span><span id="bN" class="badge hide">☀️</span><span id="bD" class="badge hide">🌑</span><span id="bS" class="badge hide">🎵</span>
+          <span id="bRate" class="badge hide"></span><span id="bNet" class="badge"></span><span id="bW" class="badge hide"></span><span id="iceB" class="badge">ICE: –</span><span id="rbat" class="badge">--</span><span id="bV" class="badge hide" data-i="bV"></span><span id="bM" class="badge hide" data-i="bM"></span><span id="bN" class="badge hide">☀️</span><span id="bD" class="badge hide">🌑</span><span id="bS" class="badge hide">🎵</span>
           <button id="fs" aria-label="Fullscreen">⛶</button>
         </div>
         <div class="bt">
@@ -143,6 +143,11 @@ footer{padding:12px;text-align:center;font-size:12px;color:var(--mut)}
           <div class="row spread"><b data-i="boost"></b><span id="gv" class="mono">150%</span></div>
           <input type="range" id="gain" min="0" max="400" value="150" style="width:100%" aria-label="Volume">
           <button id="mute" style="width:100%"></button>
+        </div>
+        <div class="card">
+          <div class="row spread"><b data-i="qT"></b><span id="ql" class="mono"></span></div>
+          <input type="range" id="qual" min="0" max="4" step="1" value="2" style="width:100%" aria-label="Video quality">
+          <p class="mut" data-i="qD"></p>
         </div>
         <div class="card">
           <div class="row spread"><b data-i="vox"></b><span id="tv" class="mono">55%</span></div>
@@ -185,7 +190,7 @@ joinT:'Forbind til baby-enhed',joinD:'Indtast koden fra babyens telefon:',conn:'
 alT:'LYD OVER GRÆNSEN!',alD:'Der er registreret vedvarende lyd på babyværelset.',dis:'Afvis',mic:'Lyd fra babyværelset:',boost:'Lydstyrke / boost',spkOn:'🔊 Højttaler tændt',spkOff:'🔇 Højttaler slukket',
 vox:'Gråde-tærskel',voxD:'Alarm ved vedvarende lyd over den røde streg.',beepL:'Bip ved alarm',remote:'Fjernstyring',ptt:'Hold for at tale',pttOn:'Taler…',last:'Seneste hændelse:',none:'Ingen endnu',unlock:'Tryk for at aktivere lyd',
 stIdle:'Vælg enhed',stWait:'Afventer kamera',stReq:'Anmoder om kamera…',stReady:'Klar til parring',stParent:'Forælder tilsluttet',stDenied:'Adgang afvist',stCalling:'Forbinder…',stLive:'Live',stLost:'Forbindelse mistet',stErr:'Fejl',
-denied:'Kunne ikke få adgang til kamera/mikrofon.',https:'Siden kører ikke over HTTPS – kamera og mikrofon virker ikke.',badCode:'Ugyldig kode.',nf:'Baby-enheden blev ikke fundet.',to:'Timeout – prøv igen.',lowBat:'Babytelefonens batteri er lavt!',vWait:'Venter på video…',vNo:'Ingen video endnu. Tryk for at prøve igen. Forbindelsestilstand:',vOff:'Video er slukket på baby-enheden',bV:'Video fra',bM:'Mikrofon fra',rN_t:'Natlys',rN_d:'Tænder/slukker et blødt lys på babytelefonens skærm.',rD_t:'Sort skærm',rD_d:'Gør babytelefonens skærm sort. Kamera og lyd kører videre.',rF_t:'Vend kamera',rF_d:'Skifter mellem for- og bagkamera.',rV_t:'Video til/fra',rV_d:'Slukker kameraet for at spare batteri. Lyden kører videre.',rM_t:'Mikrofon til/fra',rM_d:'Slår mikrofonen fra for at spare batteri. Gråde-alarmen virker ikke, mens den er slukket.',rS_d:'Sovelyd: vælger den lyd, der afspilles på babytelefonen.',rP_d:'Hold knappen nede for at tale til babyen via babytelefonens højttaler.',devT:'Godkendte enheder',wnow:'Ser med nu:',rm:'Fjern',online:'online',devD:'Gemte enheder forbinder uden kode. Maks. 2 ad gangen.',pairBtn:'Par ny enhed',dnameL:'Enhedsnavn:',forget:'Glem gemt baby-enhed',watch:'Ser med',a_denied:'Enheden er ikke (længere) godkendt. Indtast koden igen.',a_closed:'Parring er lukket. Tryk på Par ny enhed på babytelefonen.',a_full:'Babytelefonen har allerede det maksimale antal gemte enheder. Fjern en først.',a_busy:'Der er allerede 2 forældre-enheder forbundet.',net:'Forbindelse',net_local:'Lokalt netværk',net_internet:'Internet (direkte)',net_relay:'Relæ (TURN)',tBeep:'Test alarmlyd',tip:'Tip: Hold telefonen i opladeren og siden åben. Brug Sort skærm i stedet for låseknappen.',reset:'Skift enhedstype'},
+denied:'Kunne ikke få adgang til kamera/mikrofon.',https:'Siden kører ikke over HTTPS – kamera og mikrofon virker ikke.',badCode:'Ugyldig kode.',nf:'Baby-enheden blev ikke fundet.',to:'Timeout – prøv igen.',lowBat:'Babytelefonens batteri er lavt!',vWait:'Venter på video…',vNo:'Ingen video endnu. Tryk for at prøve igen. Forbindelsestilstand:',vOff:'Video er slukket på baby-enheden',bV:'Video fra',bM:'Mikrofon fra',rN_t:'Natlys',rN_d:'Tænder/slukker et blødt lys på babytelefonens skærm.',rD_t:'Sort skærm',rD_d:'Gør babytelefonens skærm sort. Kamera og lyd kører videre.',rF_t:'Vend kamera',rF_d:'Skifter mellem for- og bagkamera.',rV_t:'Video til/fra',rV_d:'Slukker kameraet for at spare batteri. Lyden kører videre.',rM_t:'Mikrofon til/fra',rM_d:'Slår mikrofonen fra for at spare batteri. Gråde-alarmen virker ikke, mens den er slukket.',rS_d:'Sovelyd: vælger den lyd, der afspilles på babytelefonen.',rP_d:'Hold knappen nede for at tale til babyen via babytelefonens højttaler.',devT:'Godkendte enheder',wnow:'Ser med nu:',rm:'Fjern',online:'online',devD:'Gemte enheder forbinder uden kode. Maks. 2 ad gangen.',pairBtn:'Par ny enhed',dnameL:'Enhedsnavn:',forget:'Glem gemt baby-enhed',watch:'Ser med',a_denied:'Enheden er ikke (længere) godkendt. Indtast koden igen.',a_closed:'Parring er lukket. Tryk på Par ny enhed på babytelefonen.',a_full:'Babytelefonen har allerede det maksimale antal gemte enheder. Fjern en først.',a_busy:'Der er allerede 2 forældre-enheder forbundet.',net:'Forbindelse',net_local:'Lokalt netværk',net_internet:'Internet (direkte)',net_relay:'Relæ (TURN)',tBeep:'Test alarmlyd',tip:'Tip: Hold telefonen i opladeren og siden åben. Brug Sort skærm i stedet for låseknappen.',reset:'Skift enhedstype',qT:'Videokvalitet / båndbredde',qD:'Lavere kvalitet bruger mindre netværk, fx hvis enheden samtidig streamer spil. Lyden fylder kun 16–64 kbit/s.',q0:'Meget lav',q1:'Lav',q2:'Middel',q3:'Høj',q4:'Maks'},
 en:{sub:'P2P browser baby monitor',pick:'Select device type',pickD:'Both devices open this page in a browser (HTTPS).',baby:'Baby device',babyD:"The phone in the baby's room. Streams video and audio.",parent:'Parent device',parentD:'The device you listen on and get alerts on.',
 priv:'Privacy: Video and audio go encrypted directly between devices (WebRTC). The connection is set up via PeerJS and Google servers, which can see IP addresses. Only devices you approved on the baby phone can connect (max 2 at a time).',
 permT:'Permission required',permD:'The browser needs camera and microphone access.',permB:'Grant access',scan:'Scan the QR code on the parent device, or enter the code:',codeL:'Code:',copy:'Copy',newCode:'New code',
@@ -195,7 +200,7 @@ joinT:'Connect to baby device',joinD:"Enter the code shown on the baby's phone:"
 alT:'NOISE OVER LIMIT!',alD:"Sustained noise detected in the baby's room.",dis:'Dismiss',mic:"Sound from baby's room:",boost:'Volume / boost',spkOn:'🔊 Speaker on',spkOff:'🔇 Speaker off',
 vox:'Cry threshold',voxD:'Alarm on sustained sound above the red line.',beepL:'Beep on alarm',remote:'Remote control',ptt:'Hold to talk',pttOn:'Talking…',last:'Last event:',none:'None yet',unlock:'Tap to enable audio',
 stIdle:'Choose device',stWait:'Waiting for camera',stReq:'Requesting camera…',stReady:'Ready to pair',stParent:'Parent connected',stDenied:'Access denied',stCalling:'Connecting…',stLive:'Live',stLost:'Connection lost',stErr:'Error',
-denied:'Could not access camera/microphone.',https:'Page is not served over HTTPS – camera and microphone will not work.',badCode:'Invalid code.',nf:'Baby device not found.',to:'Timeout – try again.',lowBat:"Baby phone's battery is low!",vWait:'Waiting for video…',vNo:'No video yet. Tap to retry. Connection state:',vOff:'Video is turned off on the baby device',bV:'Video off',bM:'Mic off',rN_t:'Nightlight',rN_d:"Turns a soft light on/off on the baby phone's screen.",rD_t:'Black screen',rD_d:'Makes the baby phone screen black. Camera and audio keep running.',rF_t:'Flip camera',rF_d:'Switches between front and back camera.',rV_t:'Video on/off',rV_d:'Turns the camera off to save battery. Audio keeps running.',rM_t:'Microphone on/off',rM_d:'Mutes the microphone to save battery. The cry alarm does not work while it is off.',rS_d:'Sleep sound: chooses the sound played on the baby phone.',rP_d:"Hold the button to talk to the baby through the baby phone's speaker.",devT:'Allowed devices',wnow:'Watching now:',rm:'Remove',online:'online',devD:'Saved devices connect without the code. Max 2 at a time.',pairBtn:'Pair new device',dnameL:'Device name:',forget:'Forget saved baby device',watch:'Watching',a_denied:'This device is not (or no longer) approved. Enter the code again.',a_closed:'Pairing is closed. Tap Pair new device on the baby phone.',a_full:'The baby phone already has the maximum number of saved devices. Remove one first.',a_busy:'Two parent devices are already connected.',net:'Link',net_local:'Local network',net_internet:'Internet (direct)',net_relay:'Relay (TURN)',tBeep:'Test alarm sound',tip:'Tip: Keep the phone plugged in with this page open. Use Black screen instead of the lock button.',reset:'Change device type'}
+denied:'Could not access camera/microphone.',https:'Page is not served over HTTPS – camera and microphone will not work.',badCode:'Invalid code.',nf:'Baby device not found.',to:'Timeout – try again.',lowBat:"Baby phone's battery is low!",vWait:'Waiting for video…',vNo:'No video yet. Tap to retry. Connection state:',vOff:'Video is turned off on the baby device',bV:'Video off',bM:'Mic off',rN_t:'Nightlight',rN_d:"Turns a soft light on/off on the baby phone's screen.",rD_t:'Black screen',rD_d:'Makes the baby phone screen black. Camera and audio keep running.',rF_t:'Flip camera',rF_d:'Switches between front and back camera.',rV_t:'Video on/off',rV_d:'Turns the camera off to save battery. Audio keeps running.',rM_t:'Microphone on/off',rM_d:'Mutes the microphone to save battery. The cry alarm does not work while it is off.',rS_d:'Sleep sound: chooses the sound played on the baby phone.',rP_d:"Hold the button to talk to the baby through the baby phone's speaker.",devT:'Allowed devices',wnow:'Watching now:',rm:'Remove',online:'online',devD:'Saved devices connect without the code. Max 2 at a time.',pairBtn:'Pair new device',dnameL:'Device name:',forget:'Forget saved baby device',watch:'Watching',a_denied:'This device is not (or no longer) approved. Enter the code again.',a_closed:'Pairing is closed. Tap Pair new device on the baby phone.',a_full:'The baby phone already has the maximum number of saved devices. Remove one first.',a_busy:'Two parent devices are already connected.',net:'Link',net_local:'Local network',net_internet:'Internet (direct)',net_relay:'Relay (TURN)',tBeep:'Test alarm sound',tip:'Tip: Keep the phone plugged in with this page open. Use Black screen instead of the lock button.',reset:'Change device type',qT:'Video quality / bandwidth',qD:'Lower quality uses less network, e.g. when this device is also streaming games. Audio only takes 16–64 kbit/s.',q0:'Very low',q1:'Low',q2:'Medium',q3:'High',q4:'Max'}
 };
 const $=id=>document.getElementById(id);
 let lang=localStorage.getItem('bba-lang')||(navigator.language.startsWith('da')?'da':'en');
@@ -203,7 +208,7 @@ const t=k=>D[lang][k]||k;
 function applyLang(){
   document.documentElement.lang=lang;$('lang').value=lang;
   document.querySelectorAll('[data-i]').forEach(e=>e.textContent=t(e.dataset.i));
-  updateMute();if(!lastSet)$('last').textContent=t('none');
+  updateMute();qLabel(+$('qual').value);if(!lastSet)$('last').textContent=t('none');
 }
 $('lang').onchange=e=>{lang=e.target.value;localStorage.setItem('bba-lang',lang);applyLang()};
 
@@ -251,7 +256,7 @@ const saveDevs=()=>localStorage.setItem('bba-devs',JSON.stringify(devs));
 const bcast=m=>viewers.forEach(v=>send(v.conn,m));
 const calls=()=>[...viewers.values()].map(v=>v.call).filter(Boolean);
 const vnames=()=>[...viewers.values()].map(v=>v.n);
-let night=false,dim=false,sound='off',bat={l:100,c:false,e:true},level=0,vidOn=true,micOn=true;
+let night=false,dim=false,sound='off',bat={l:100,c:false,e:true},level=0,vidOn=true,micOn=true,qual=(()=>{const q=localStorage.getItem('bba-q');return q===null?2:Math.max(0,Math.min(4,+q||0))})();
 $('bBtn').onclick=()=>{localStorage.removeItem('bba-role');show('baby');setStatus(t('stWait'),'warn');initBattery();if(!window.isSecureContext)note(t('https'),'bad')};
 $('grant').onclick=grant;
 async function setVideo(){
@@ -284,7 +289,7 @@ function startMeter(a){   // single meter loop; setInterval keeps running when t
   setInterval(()=>{
     an.getByteTimeDomainData(d);let s=0;for(const x of d){const n=(x-128)/128;s+=n*n}
     level=lvl(Math.sqrt(s/d.length));
-    $('mbar').style.width=level+'%';bcast({type:'lvl',v:level});
+    $('mbar').style.width=level+'%';pk=Math.max(pk,level);if(++mn%3===0){bcast({type:'lvl',v:pk});pk=0}
   },100);
 }
 let babyReady=false;
@@ -356,6 +361,9 @@ function initBabyPeer(){
     if(c.metadata&&c.metadata.type==='intercom'){c.answer();c.on('stream',s=>{$('ic').srcObject=s;$('ic').play().catch(()=>{})});return}
     if(v.call&&v.call!==c)try{v.call.close()}catch(e){}
     v.call=c;c.answer(stream);setStatus(t('stParent'),'ok');
+    const pc=c.peerConnection;   // caps can only be set once the call is negotiated
+    if(pc)pc.addEventListener('iceconnectionstatechange',()=>{if(pc.iceConnectionState==='connected'||pc.iceConnectionState==='completed')applyQ()});
+    setTimeout(applyQ,3000);
     c.on('close',()=>{if(v.call===c)v.call=null});
   });
   peer.on('error',e=>{
@@ -370,11 +378,12 @@ $('nc2').onclick=()=>{
   babyReady=false;if(peer)peer.destroy();peer=null;initBabyPeer();
 };
 $('cp').onclick=()=>navigator.clipboard&&navigator.clipboard.writeText($('code').textContent).catch(()=>{});
-function syncState(){bcast({type:'st',viewers:vnames(),night,dim,sound,vid:vidOn,mic:micOn,bat:{l:Math.round(bat.l),c:bat.c,e:bat.e}})}
+function syncState(){bcast({type:'st',viewers:vnames(),night,dim,sound,vid:vidOn,mic:micOn,q:qual,bat:{l:Math.round(bat.l),c:bat.c,e:bat.e}})}
 function command(m){   // whitelist only
   if(m.a==='night')setNight(!night);else if(m.a==='dim')setDim(!dim);else if(m.a==='flip')flip();
   else if(m.a==='sound'&&SOUNDS.includes(m.v))setSound(m.v);
   else if(m.a==='vid')setVid(!vidOn);else if(m.a==='mic')setMic(!micOn);
+  else if(m.a==='q'&&m.v>=0&&m.v<=4)setQ(m.v|0);
 }
 async function setVid(on){   // off = release the camera hardware (the real battery saving)
   vidOn=on;
@@ -390,6 +399,24 @@ async function setVid(on){   // off = release the camera hardware (the real batt
   }catch(e){vidOn=!on;note(t('denied'),'bad')}
   syncState();
 }
+const Q=[{b:150e3,s:4,f:5,a:16e3},{b:300e3,s:3,f:10,a:24e3},{b:600e3,s:2,f:15,a:32e3},{b:1.2e6,s:1,f:24,a:48e3},{b:2.5e6,s:1,f:30,a:64e3}];   // video bitrate / downscale / fps, audio bitrate
+let pk=0,mn=0;
+async function applyQ(){   // caps video bitrate, resolution, fps and audio bitrate on every active call
+  const q=Q[qual];
+  for(const c of calls()){
+    const pc=c.peerConnection;if(!pc)continue;
+    for(const tr of pc.getTransceivers()){
+      try{
+        const k=tr.receiver&&tr.receiver.track&&tr.receiver.track.kind;if(!k)continue;
+        const p=tr.sender.getParameters();if(!p.encodings||!p.encodings.length)p.encodings=[{}];
+        if(k==='video'){p.encodings[0].maxBitrate=q.b;p.encodings[0].scaleResolutionDownBy=q.s;p.encodings[0].maxFramerate=q.f}
+        else p.encodings[0].maxBitrate=q.a;
+        await tr.sender.setParameters(p);
+      }catch(e){}
+    }
+  }
+}
+function setQ(n){qual=n;localStorage.setItem('bba-q',n);applyQ();syncState()}
 function setMic(on){micOn=on;if(audioTrack)audioTrack.enabled=on;syncState()}
 function ov(){$('nightOv').classList.toggle('hide',!night);$('dimOv').classList.toggle('hide',!dim);syncState()}
 function setNight(on){night=on;if(on)dim=false;ov()}
@@ -539,17 +566,21 @@ function startCall(){
   });
   c.on('close',()=>{if(pcall===c&&!lost)setLost(true)});
 }
-let nt=null;
+let nt=null,lastB=0,lastT=0;
 async function netType(){   // which route the video really takes: same network / internet / relay
   const b=$('bNet'),q=pcall&&pcall.peerConnection;
-  if(!q||(ice!=='connected'&&ice!=='completed')){b.textContent=t('net')+': –';b.className='badge';return}
+  if(!q||(ice!=='connected'&&ice!=='completed')){b.textContent=t('net')+': –';b.className='badge';$('bRate').classList.add('hide');lastB=0;return}
   try{
-    const st=await q.getStats();let sel=null;const pairs=[],c={};
+    const st=await q.getStats();let sel=null,by=0;const pairs=[],c={};
     st.forEach(r=>{
       if(r.type==='transport'&&r.selectedCandidatePairId)sel=r.selectedCandidatePairId;
       else if(r.type==='candidate-pair')pairs.push(r);
       else if(r.type==='local-candidate'||r.type==='remote-candidate')c[r.id]=r;
+      else if(r.type==='inbound-rtp')by+=r.bytesReceived||0;
     });
+    const now=Date.now();   // live receive rate (audio + video) so you can see the throttle working
+    if(lastB&&by>=lastB&&now>lastT){const k=Math.round((by-lastB)*8/(now-lastT));$('bRate').textContent='↓ '+(k>=1000?(k/1000).toFixed(1)+' Mbit/s':k+' kbit/s');$('bRate').classList.remove('hide')}
+    lastB=by;lastT=now;
     const pr=pairs.find(x=>x.id===sel)||pairs.find(x=>x.nominated&&x.state==='succeeded')||pairs.find(x=>x.state==='succeeded');
     if(!pr)return;
     const a=(c[pr.localCandidateId]||{}).candidateType,z=(c[pr.remoteCandidateId]||{}).candidateType;
@@ -598,6 +629,7 @@ function onData(m){
     $('bN').classList.toggle('hide',!m.night);$('bD').classList.toggle('hide',!m.dim);$('bS').classList.toggle('hide',m.sound==='off');
     if(m.sound)$('rsnd').value=m.sound;battery(m.bat);
     if(m.viewers){$('bW').classList.remove('hide');$('bW').textContent=t('watch')+': '+m.viewers.length}
+    if(m.q!=null){$('qual').value=m.q;qLabel(m.q)}
     vidOffR=m.vid===false;$('bV').classList.toggle('hide',!vidOffR);$('bM').classList.toggle('hide',m.mic!==false);
     $('rN').classList.toggle('on',!!m.night);$('rD').classList.toggle('on',!!m.dim);$('rV').classList.toggle('on',vidOffR);$('rM').classList.toggle('on',m.mic===false);
     if(vidOffR){$('vwait').classList.remove('hide');$('vmsg').textContent=t('vOff')}else chk();
@@ -657,6 +689,10 @@ $('dis').onclick=()=>{
 
 /* remote control + push-to-talk (persistent intercom call, mic gated with track.enabled) */
 $('rN').onclick=()=>send(pconn,{a:'night'});$('rD').onclick=()=>send(pconn,{a:'dim'});$('rF').onclick=()=>send(pconn,{a:'flip'});$('rV').onclick=()=>send(pconn,{a:'vid'});$('rM').onclick=()=>send(pconn,{a:'mic'});
+const QK=[150,300,600,1200,2500];
+function qLabel(n){const k=QK[n];$('ql').textContent=t('q'+n)+' · ≤ '+(k>=1000?k/1000+' Mbit/s':k+' kbit/s')}
+$('qual').oninput=e=>qLabel(+e.target.value);
+$('qual').onchange=e=>send(pconn,{a:'q',v:+e.target.value});
 $('rsnd').onchange=e=>send(pconn,{a:'sound',v:e.target.value});
 $('fs').onclick=()=>{document.fullscreenElement?document.exitFullscreen().catch(()=>{}):$('frame').requestFullscreen().catch(()=>{})};
 async function pttStart(e){
