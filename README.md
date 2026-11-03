@@ -4,7 +4,7 @@ A baby monitor that runs entirely in the browser. Put one phone in the baby's ro
 
 - Live **video and audio**, sent directly between your devices with WebRTC (via [PeerJS](https://peerjs.com))
 - **Cry alarm** that triggers on sustained sound, gets louder until dismissed, and vibrates / notifies
-- Up to **2 parents at once**, with a "Watching: N" badge, and **saved devices** so you only pair once
+- **Any number of parents at once**, with a "Watching: N" badge, and **saved devices** so you only pair once
 - **Quality / bandwidth slider** (5 steps, from about 0.15 to 2.5 Mbit/s of video) and a live receive-rate badge, so the monitor stays out of the way of games or video calls
 - **Remote control** of the baby phone: nightlight, black screen, flip camera, camera on/off and mic on/off (battery saving), sleep sounds, push-to-talk
 - **Sleep sounds** generated in the browser: womb noise, rain, ocean waves, fireplace, lullaby
@@ -16,6 +16,10 @@ A baby monitor that runs entirely in the browser. Put one phone in the baby's ro
 ## Quick start (GitHub Pages)
 
 Camera and microphone access require **HTTPS** (or `localhost`). The easiest way to get HTTPS is GitHub Pages:
+
+1. Fork or upload this repository to your GitHub account.
+2. **Settings → Pages →** deploy from the `main` branch, root folder.
+3. Open `https://<your-user>.github.io/<repo>/` on both devices.
 
 **Baby phone:** tap *Baby device* → *Grant access*. A QR code and a code appear.
 **Parent device:** tap *Parent device*, scan the QR code or type the code, and optionally give the device a name.
@@ -51,7 +55,7 @@ From then on, the parent device reconnects by itself when you open the app.
 
 - The baby phone's code is a random 10-character secret that forms its peer ID.
 - A device can only connect if it holds a **private token** issued by the baby phone, or while the **pairing window** is open. Tokens are stored in the browser's `localStorage` on both sides.
-- At most 2 parents are connected at the same time; at most 4 devices are remembered.
+- There is no fixed limit on parents or remembered devices (see `MAXV` / `MAXD` in `index.html` to restrict them). Every extra viewer is a separate video stream from the baby phone, so many viewers cost battery and upload bandwidth; use the quality slider.
 - Calls and commands are only accepted from devices that authenticated first; remote commands are checked against a whitelist.
 - A strict Content-Security-Policy limits scripts to this site and connections to the PeerJS server. Libraries are self-hosted in `lib/`.
 
